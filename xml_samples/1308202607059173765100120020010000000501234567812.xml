@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<autorizacion><estado>AUTORIZADO</estado><numeroAutorizacion>1308202607059173765100120020010000000501234567812</numeroAutorizacion><fechaAutorizacion>2026-08-13T17:31:23-05:00</fechaAutorizacion><ambiente>PRODUCCIÓN</ambiente><comprobante>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;comprobanteRetencion id="comprobante" version="2.0.0"&gt;
+&lt;infoTributaria&gt;
+&lt;ambiente&gt;2&lt;/ambiente&gt;
+&lt;tipoEmision&gt;1&lt;/tipoEmision&gt;
+&lt;razonSocial&gt;MEGA FERRETERIA BONILLA BONILLA MEGA BB CIA LTDA&lt;/razonSocial&gt;
+&lt;ruc&gt;0591737651001&lt;/ruc&gt;
+&lt;claveAcceso&gt;1308202607059173765100120020010000000501234567812&lt;/claveAcceso&gt;
+&lt;codDoc&gt;07&lt;/codDoc&gt;
+&lt;estab&gt;002&lt;/estab&gt;
+&lt;ptoEmi&gt;001&lt;/ptoEmi&gt;
+&lt;secuencial&gt;000000050&lt;/secuencial&gt;
+&lt;dirMatriz&gt;AV 19 DE MAYO INTERSACCION JAIME ROLDOS AGUILERA&lt;/dirMatriz&gt;
+&lt;agenteRetencion&gt;1&lt;/agenteRetencion&gt;
+&lt;/infoTributaria&gt;
+&lt;infoCompRetencion&gt;
+&lt;fechaEmision&gt;13/08/2026&lt;/fechaEmision&gt;
+&lt;dirEstablecimiento&gt;AV 19 DE MAYO Y JAIME ROLDOS AGUILERA-&lt;/dirEstablecimiento&gt; 
+&lt;obligadoContabilidad&gt;SI&lt;/obligadoContabilidad&gt;
+&lt;tipoIdentificacionSujetoRetenido&gt;04&lt;/tipoIdentificacionSujetoRetenido&gt;
+&lt;parteRel&gt;NO&lt;/parteRel&gt;
+&lt;razonSocialSujetoRetenido&gt;IMPOR EXPORT AROMOTOR CIA. LTDA.&lt;/razonSocialSujetoRetenido&gt;
+&lt;identificacionSujetoRetenido&gt;2390000831001&lt;/identificacionSujetoRetenido&gt;
+&lt;periodoFiscal&gt;08/2026&lt;/periodoFiscal&gt;
+&lt;/infoCompRetencion&gt;
+&lt;docsSustento&gt;
+&lt;docSustento&gt;
+&lt;codSustento&gt;06&lt;/codSustento&gt;
+&lt;codDocSustento&gt;01&lt;/codDocSustento&gt;
+&lt;numDocSustento&gt;001003000089356&lt;/numDocSustento&gt;
+&lt;fechaEmisionDocSustento&gt;07/08/2026&lt;/fechaEmisionDocSustento&gt;
+&lt;fechaRegistroContable&gt;07/08/2026&lt;/fechaRegistroContable&gt;
+&lt;numAutDocSustento&gt;0708202601239000083100120010030000893560008935613&lt;/numAutDocSustento&gt;
+&lt;pagoLocExt&gt;01&lt;/pagoLocExt&gt;
+&lt;totalSinImpuestos&gt;315.84&lt;/totalSinImpuestos&gt;
+&lt;importeTotal&gt;363.22&lt;/importeTotal&gt;
+&lt;impuestosDocSustento&gt;
+&lt;impuestoDocSustento&gt;
+&lt;codImpuestoDocSustento&gt;2&lt;/codImpuestoDocSustento&gt;
+&lt;codigoPorcentaje&gt;4&lt;/codigoPorcentaje&gt;
+&lt;baseImponible&gt;315.84&lt;/baseImponible&gt;
+&lt;tarifa&gt;15.00&lt;/tarifa&gt;
+&lt;valorImpuesto&gt;47.38&lt;/valorImpuesto&gt;
+&lt;/impuestoDocSustento&gt;
+&lt;/impuestosDocSustento&gt;
+&lt;retenciones&gt;
+&lt;retencion&gt;
+&lt;codigo&gt;1&lt;/codigo&gt;
+&lt;codigoRetencion&gt;312&lt;/codigoRetencion&gt;
+&lt;baseImponible&gt;315.84&lt;/baseImponible&gt;
+&lt;porcentajeRetener&gt;2.00&lt;/porcentajeRetener&gt;
+&lt;valorRetenido&gt;6.32&lt;/valorRetenido&gt;
+&lt;/retencion&gt;
+&lt;/retenciones&gt;
+&lt;pagos&gt;
+&lt;pago&gt;
+&lt;formaPago&gt;20&lt;/formaPago&gt;
+&lt;total&gt;363.22&lt;/total&gt;
+&lt;/pago&gt;
+&lt;/pagos&gt;
+&lt;/docSustento&gt;
+&lt;/docsSustento&gt;
+&lt;infoAdicional&gt;
+&lt;campoAdicional nombre="Direccion"&gt; SANTO DOMINGO - C/CAMINO A BENGALA Y AV LOS COLONOS&lt;/campoAdicional&gt;
+&lt;campoAdicional nombre="Telefono"&gt; 023746440&lt;/campoAdicional&gt;
+&lt;campoAdicional nombre="Email"&gt; cxccaromotor@gmail.com&lt;/campoAdicional&gt;
+&lt;/infoAdicional&gt;
+&lt;ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#" xmlns:etsi="http://uri.etsi.org/01903/v1.3.2#" Id="Signature811048"&gt;
+&lt;ds:SignedInfo Id="Signature-SignedInfo246285"&gt;
+&lt;ds:CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"&gt;&lt;/ds:CanonicalizationMethod&gt;
+&lt;ds:SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"&gt;&lt;/ds:SignatureMethod&gt;
+&lt;ds:Reference Id="SignedPropertiesID307009" Type="http://uri.etsi.org/01903#SignedProperties" URI="#Signature811048-SignedProperties20447"&gt;
+&lt;ds:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"&gt;&lt;/ds:DigestMethod&gt;
+&lt;ds:DigestValue&gt;hV7COggMggw26ZXX1SOeX9iJ+p4=&lt;/ds:DigestValue&gt;
+&lt;/ds:Reference&gt;
+&lt;ds:Reference URI="#Certificate1187619"&gt;
+&lt;ds:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"&gt;&lt;/ds:DigestMethod&gt;
+&lt;ds:DigestValue&gt;cQ1zASmnqwWBBRNhO/C/eY/ic3c=&lt;/ds:DigestValue&gt;
+&lt;/ds:Reference&gt;
+&lt;ds:Reference Id="Reference-ID-359497" URI="#comprobante"&gt;
+&lt;ds:Transforms&gt;
+&lt;ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"&gt;&lt;/ds:Transform&gt;
+&lt;/ds:Transforms&gt;
+&lt;ds:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"&gt;&lt;/ds:DigestMethod&gt;
+&lt;ds:DigestValue&gt;qWxT4R9jR5tvdDa1/I15eyBJtOI=&lt;/ds:DigestValue&gt;
+&lt;/ds:Reference&gt;
+&lt;/ds:SignedInfo&gt;
+&lt;ds:SignatureValue Id="SignatureValue742508"&gt;
+JkgUIwGN1cX9rfLK7Hmst+vbv6oT4A9l3Ry6Md5RqgZ0ElFXjOIrrBkashrRtrJxEXxoqg1egCG8
+0KWRS0LO/YlSyX7iZvVC35xExd5WIxzh/2nU3OuNpL+OJB/9qYo+1gdcvOFPTJnKojQSN7iFlMAv
+GyiJIKGXfhtzrFFzx84hAqm31P2iQWM0idhAO6DymMCeTqZgvcui7b9Ig3EJCXZ0UUEyHYbKcYRF
+4I2GOFBTHNGAm9OrPpPf8nOW92U1AurcUWAK95hLA4JaVTMNsJyZnCFN91jkwIcMfWYnsnNU06Yf
+CScdhPP8cHaevYJtEBpQBvNQYGUk3QB5/LBdzw==
+&lt;/ds:SignatureValue&gt;
+&lt;ds:KeyInfo Id="Certificate1187619"&gt;
+&lt;ds:X509Data&gt;
+&lt;ds:X509Certificate&gt;
+MIIMTjCCCjagAwIBAgIEMLxb7TANBgkqhkiG9w0BAQsFADCBmTELMAkGA1UEBhMCRUMxHTAbBgNV
+BAoMFFNFQ1VSSVRZIERBVEEgUy5BLiAyMTAwLgYDVQQLDCdFTlRJREFEIERFIENFUlRJRklDQUNJ
+T04gREUgSU5GT1JNQUNJT04xOTA3BgNVBAMMMEFVVE9SSURBRCBERSBDRVJUSUZJQ0FDSU9OIFNV
+QkNBLTIgU0VDVVJJVFkgREFUQTAeFw0yNTAxMjAyMDIzMjRaFw0yODAxMjAyMDIzMjRaMIGoMSYw
+JAYDVQQDDB1EQVZJRCBJU1JBRUwgQk9OSUxMQSBQSUxBVEFYSTEgMB4GA1UEBRMXMDUwMzMwMjE4
+NC0yMDAxMjUxNTMzMTcxMDAuBgNVBAsMJ0VOVElEQUQgREUgQ0VSVElGSUNBQ0lPTiBERSBJTkZP
+Uk1BQ0lPTjEdMBsGA1UECgwUU0VDVVJJVFkgREFUQSBTLkEuIDIxCzAJBgNVBAYTAkVDMIIBIjAN
+BgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAmdSo57+BgI0ui1DFrVyD51A0YEAxj9IYAFCEo1Zp
+LxlgxZ2TdHksJKUDHxYXnq80TnJcN4/zo8Fag5x9BTCLFcwdF0OFo86UWMeNPokjGJpgRWRTEjUc
+uWa6kNC1TJSFfaLC5/A+/QnpkDrerck5bpqIN5zw7PUoZwiDZk73mkmEzFOscLn4wR7nWjQcNlQt
+nVXgPcFgaNW/69vaXQu+sSAwexhoeNS7RIgMx4Llpr1IqUUz3wm8D511g5sWViSVvYCPP5nJEps+
+7RSzxZoG+3IndHGqPhAgWGxbJ9+QtVQx4W6PWjewx02PzqGVLmHSOH3Wxh3tEEbwRR7KHAIRXQID
+AQABo4IHizCCB4cwDAYDVR0TAQH/BAIwADAfBgNVHSMEGDAWgBSMusoRV3glgB1rCktVv42uYt29
+jzBZBggrBgEFBQcBAQRNMEswSQYIKwYBBQUHMAGGPWh0dHA6Ly9vY3NwZ3cuc2VjdXJpdHlkYXRh
+Lm5ldC5lYy9lamJjYS9wdWJsaWN3ZWIvc3RhdHVzL29jc3Awgc8GA1UdLgSBxzCBxDCBwaCBvqCB
+u4aBuGxkYXA6Ly9sZGFwc2RjYTIuc2VjdXJpdHlkYXRhLm5ldC5lYy9DTj1BVVRPUklEQUQgREUg
+Q0VSVElGSUNBQ0lPTiBTVUJDQS0yIFNFQ1VSSVRZIERBVEEsT1U9RU5USURBRCBERSBDRVJUSUZJ
+Q0FDSU9OIERFIElORk9STUFDSU9OLE89U0VDVVJJVFkgREFUQSBTLkEuIDIsQz1FQz9kZWx0YVJl
+dm9jYXRpb25MaXN0P2Jhc2UwLgYDVR0RBCcwJYEjZmVycmV0ZXJpYV9ib25pbGxhLjIwMTRAaG90
+bWFpbC5jb20wggEVBgNVHSAEggEMMIIBCDBiBgorBgEEAYKmcgIJMFQwUgYIKwYBBQUHAgIwRh5E
+AEMAZQByAHQAaQBmAGkAYwBhAGQAbwAgAGQAZQAgAFIAZQBwAHIAZQBzAGUAbgB0AGEAbgB0AGUA
+IABMAGUAZwBhAGwwgaEGCisGAQQBgqZyAgMwgZIwgY8GCCsGAQUFBwIBFoGCaHR0cHM6Ly93d3cu
+c2VjdXJpdHlkYXRhLm5ldC5lYy93cC1jb250ZW50L2Rvd25sb2Fkcy9Ob3JtYXRpdmFzL1BfZGVf
+Q2VydGlmaWNhZG9zL1BvbGl0aWNhcyBkZSBDZXJ0aWZpY2FkbyBSZXByZXNlbnRhbnRlIExlZ2Fs
+LnBkZjAdBgNVHSUEFjAUBggrBgEFBQcDAgYIKwYBBQUHAwQwggKiBgNVHR8EggKZMIIClTCB5aBB
+oD+GPWh0dHA6Ly9vY3NwZ3cuc2VjdXJpdHlkYXRhLm5ldC5lYy9lamJjYS9wdWJsaWN3ZWIvc3Rh
+dHVzL29jc3CigZ+kgZwwgZkxOTA3BgNVBAMMMEFVVE9SSURBRCBERSBDRVJUSUZJQ0FDSU9OIFNV
+QkNBLTIgU0VDVVJJVFkgREFUQTEwMC4GA1UECwwnRU5USURBRCBERSBDRVJUSUZJQ0FDSU9OIERF
+IElORk9STUFDSU9OMR0wGwYDVQQKDBRTRUNVUklUWSBEQVRBIFMuQS4gMjELMAkGA1UEBhMCRUMw
+gceggcSggcGGgb5sZGFwOi8vbGRhcHNkY2EyLnNlY3VyaXR5ZGF0YS5uZXQuZWMvQ049QVVUT1JJ
+REFEIERFIENFUlRJRklDQUNJT04gU1VCQ0EtMiBTRUNVUklUWSBEQVRBLE9VPUVOVElEQUQgREUg
+Q0VSVElGSUNBQ0lPTiBERSBJTkZPUk1BQ0lPTixPPVNFQ1VSSVRZIERBVEEgUy5BLiAyLEM9RUM/
+Y2VydGlmaWNhdGVSZXZvY2F0aW9uTGlzdD9iYXNlMIHgoIHdoIHahoHXaHR0cHM6Ly9wb3J0YWwt
+b3BlcmFkb3IyLnNlY3VyaXR5ZGF0YS5uZXQuZWMvZWpiY2EvcHVibGljd2ViL3dlYmRpc3QvY2Vy
+dGRpc3Q/Y21kPWNybCZpc3N1ZXI9Q049QVVUT1JJREFEIERFIENFUlRJRklDQUNJT04gU1VCQ0Et
+MiBTRUNVUklUWSBEQVRBLE9VPUVOVElEQUQgREUgQ0VSVElGSUNBQ0lPTiBERSBJTkZPUk1BQ0lP
+TixPPVNFQ1VSSVRZIERBVEEgUy5BLiAyLEM9RUMwHQYDVR0OBBYEFCsXEvf5qCu/dSFYRHLwx6BS
+aBeWMCsGA1UdEAQkMCKADzIwMjUwMTIwMjAyMzI0WoEPMjAyODAxMjAyMDIzMjRaMAsGA1UdDwQE
+AwIF4DAXBgorBgEEAYKmcgMFBAkMB0dFUkVOVEUwGgYKKwYBBAGCpnIDAQQMDAowNTAzMzAyMTg0
+MBcGCisGAQQBgqZyAwkECQwHTEEgTUFOQTARBgorBgEEAYKmcgMiBAMMAS4wOQYKKwYBBAGCpnID
+BwQrDClBViAxOSBERSBNQVlPIFMgTiBZIEpBSU1FIFJPTERPUyBBR1VJTEVSQTAcBgorBgEEAYKm
+cgMCBA4MDERBVklEIElTUkFFTDAfBgorBgEEAYKmcgMgBBEMDzAxNTAwMTAwMDAwNjI5MzATBgor
+BgEEAYKmcgMhBAUMA1BGWDAXBgorBgEEAYKmcgMMBAkMB0VDVUFET1IwFwYKKwYBBAGCpnIDAwQJ
+DAdCT05JTExBMEIGCisGAQQBgqZyAwoENAwyTUVHQSBGRVJSRVRFUklBIEJPTklMTEEgWSBCT05J
+TExBIE1FR0FCWUIgQ0lBIExUREEwHQYKKwYBBAGCpnIDCwQPDA0wNTkxNzM3NjUxMDAxMBEGCisG
+AQQBgqZyAx0EAwwBLjAYBgorBgEEAYKmcgMEBAoMCFBJTEFUQVhJMBAGCisGAQQBgqZyAwgEAgwA
+MA0GCSqGSIb3DQEBCwUAA4ICAQCVXQ53jHpZtY/CD6wjVxRDX4JlYeLihBuDZ6Q2kV/VwDWlqF8N
+geeWLSM9hJ7d9EZJE4+eqJ/zky8t8wFj7Cy9h6PmIzrl5m/IRtkPg84XIy1n4qgsvw5XMS+Yeg3c
+nqx+KY8LroV6Ibuvgf753pP/fZcO3A41fLzOGLIbn5eVSHcJGY35Pj9BU2ZwhBu+y65iUxoLXS2v
+w+NcE7UQJpilDlpCm6XjTWfFSZ2ACrSBGsvCPc68Du88bKYcIz1pIQk0YR5xCFbpVXo+92dQTVDw
+ugjsGWcS9cnPj0oX99qU2r8JDi4d84XOK/jfYYF8JfZ0e26H3on4okQx/pCU0TyrhiEhC5SNgIZM
+uRqPQyJxCHYAkboKKTqlNfhxkL5lfJkeRj1WUXbFtSSRLUywbZDmFZ+vq4Cazo8LOAmmCiwj4pgb
+b2NAUJL804yvTXML0N822mF77Szo96IC3S/fa6OBLoCZ/8lziMGaO5QSUZ+aWm45mfWBkk0+YlCu
+78l8wBFvytqyIczTJV0mf9aCjJf+mfhc9y7jhdF0ow/OuIwgv5IDgbR01GD7SOdT2tQn1NBaa+Qs
+rQ2e0rrfH21a966hYmZBNCHYcCepUjmZ+4t7yohLRkugeEshLFYOB1kGRqYJNI7wPfPJJpbA5sOg
+C/FaK50niBMJCrf7vM47xRIIpg==
+&lt;/ds:X509Certificate&gt;
+&lt;/ds:X509Data&gt;
+&lt;ds:KeyValue&gt;
+&lt;ds:RSAKeyValue&gt;
+&lt;ds:Modulus&gt;
+mdSo57+BgI0ui1DFrVyD51A0YEAxj9IYAFCEo1ZpLxlgxZ2TdHksJKUDHxYXnq80TnJcN4/zo8Fa
+g5x9BTCLFcwdF0OFo86UWMeNPokjGJpgRWRTEjUcuWa6kNC1TJSFfaLC5/A+/QnpkDrerck5bpqI
+N5zw7PUoZwiDZk73mkmEzFOscLn4wR7nWjQcNlQtnVXgPcFgaNW/69vaXQu+sSAwexhoeNS7RIgM
+x4Llpr1IqUUz3wm8D511g5sWViSVvYCPP5nJEps+7RSzxZoG+3IndHGqPhAgWGxbJ9+QtVQx4W6P
+Wjewx02PzqGVLmHSOH3Wxh3tEEbwRR7KHAIRXQ==
+&lt;/ds:Modulus&gt;
+&lt;ds:Exponent&gt;AQAB&lt;/ds:Exponent&gt;
+&lt;/ds:RSAKeyValue&gt;
+&lt;/ds:KeyValue&gt;
+&lt;/ds:KeyInfo&gt;
+&lt;ds:Object Id="Signature811048-Object53637"&gt;&lt;etsi:QualifyingProperties Target="#Signature811048"&gt;&lt;etsi:SignedProperties Id="Signature811048-SignedProperties20447"&gt;&lt;etsi:SignedSignatureProperties&gt;&lt;etsi:SigningTime&gt;2026-08-13T17:31:22-05:00&lt;/etsi:SigningTime&gt;&lt;etsi:SigningCertificate&gt;&lt;etsi:Cert&gt;&lt;etsi:CertDigest&gt;&lt;ds:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"&gt;&lt;/ds:DigestMethod&gt;&lt;ds:DigestValue&gt;SmKGijWbMhaDaIXk3ACYUEcVe+k=&lt;/ds:DigestValue&gt;&lt;/etsi:CertDigest&gt;&lt;etsi:IssuerSerial&gt;&lt;ds:X509IssuerName&gt;CN=AUTORIDAD DE CERTIFICACION SUBCA-2 SECURITY DATA,OU=ENTIDAD DE CERTIFICACION DE INFORMACION,O=SECURITY DATA S.A. 2,C=EC&lt;/ds:X509IssuerName&gt;&lt;ds:X509SerialNumber&gt;817650669&lt;/ds:X509SerialNumber&gt;&lt;/etsi:IssuerSerial&gt;&lt;/etsi:Cert&gt;&lt;/etsi:SigningCertificate&gt;&lt;/etsi:SignedSignatureProperties&gt;&lt;etsi:SignedDataObjectProperties&gt;&lt;etsi:DataObjectFormat ObjectReference="#Reference-ID-359497"&gt;&lt;etsi:Description&gt;contenido comprobante&lt;/etsi:Description&gt;&lt;etsi:MimeType&gt;text/xml&lt;/etsi:MimeType&gt;&lt;/etsi:DataObjectFormat&gt;&lt;/etsi:SignedDataObjectProperties&gt;&lt;/etsi:SignedProperties&gt;&lt;/etsi:QualifyingProperties&gt;&lt;/ds:Object&gt;&lt;/ds:Signature&gt;&lt;/comprobanteRetencion&gt;</comprobante><mensajes/></autorizacion>

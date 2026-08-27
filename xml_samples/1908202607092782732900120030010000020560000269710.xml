@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<autorizacion><estado>AUTORIZADO</estado><numeroAutorizacion>1908202607092782732900120030010000020560000269710</numeroAutorizacion><fechaAutorizacion>2026-08-19T15:26:24-05:00</fechaAutorizacion><ambiente>PRODUCCIÓN</ambiente><comprobante>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;comprobanteRetencion id="comprobante" version="2.0.0"&gt;
+&lt;infoTributaria&gt;
+	&lt;ambiente&gt;2&lt;/ambiente&gt;
+	&lt;tipoEmision&gt;1&lt;/tipoEmision&gt;
+	&lt;razonSocial&gt;CASTAO ZULUAGA JORGE IVAN&lt;/razonSocial&gt;
+	&lt;nombreComercial&gt;GYPSUM LOS PAISAS&lt;/nombreComercial&gt;
+	&lt;ruc&gt;0927827329001&lt;/ruc&gt;
+	&lt;claveAcceso&gt;1908202607092782732900120030010000020560000269710&lt;/claveAcceso&gt;
+	&lt;codDoc&gt;07&lt;/codDoc&gt;
+	&lt;estab&gt;003&lt;/estab&gt;
+	&lt;ptoEmi&gt;001&lt;/ptoEmi&gt;
+	&lt;secuencial&gt;000002056&lt;/secuencial&gt;
+	&lt;dirMatriz&gt;PARROQUIA 7 DE OCTUBRE Av WALTER ANDRADE ENTRE PRIMERA Y 2DA &lt;/dirMatriz&gt;
+	&lt;agenteRetencion&gt;1&lt;/agenteRetencion&gt;
+&lt;/infoTributaria&gt;
+&lt;infoCompRetencion&gt;
+	&lt;fechaEmision&gt;19/08/2026&lt;/fechaEmision&gt;
+	&lt;dirEstablecimiento&gt;AV GUAYAQUIL JUNTO A LA CTE&lt;/dirEstablecimiento&gt;
+	&lt;obligadoContabilidad&gt;SI&lt;/obligadoContabilidad&gt;
+	&lt;tipoIdentificacionSujetoRetenido&gt;04&lt;/tipoIdentificacionSujetoRetenido&gt;
+	&lt;parteRel&gt;NO&lt;/parteRel&gt;
+	&lt;razonSocialSujetoRetenido&gt;IMPOR EXPORT AROMOTOR CIA LTDA&lt;/razonSocialSujetoRetenido&gt;
+	&lt;identificacionSujetoRetenido&gt;2390000831001&lt;/identificacionSujetoRetenido&gt;
+	&lt;periodoFiscal&gt;08/2026&lt;/periodoFiscal&gt;
+&lt;/infoCompRetencion&gt;
+&lt;docsSustento&gt;
+	&lt;docSustento&gt;
+		&lt;codSustento&gt;06&lt;/codSustento&gt;
+		&lt;codDocSustento&gt;01&lt;/codDocSustento&gt;
+		&lt;numDocSustento&gt;001003000090223&lt;/numDocSustento&gt;
+		&lt;fechaEmisionDocSustento&gt;18/08/2026&lt;/fechaEmisionDocSustento&gt;
+		&lt;fechaRegistroContable&gt;19/08/2026&lt;/fechaRegistroContable&gt;
+		&lt;numAutDocSustento&gt;180820260123900083100120010030000902230009022318&lt;/numAutDocSustento&gt;
+		&lt;pagoLocExt&gt;01&lt;/pagoLocExt&gt;
+		&lt;totalSinImpuestos&gt;0.00&lt;/totalSinImpuestos&gt;
+		&lt;importeTotal&gt;399.28&lt;/importeTotal&gt;
+	&lt;impuestosDocSustento&gt;
+	&lt;impuestoDocSustento&gt;
+		&lt;codImpuestoDocSustento&gt;2&lt;/codImpuestoDocSustento&gt;
+		&lt;codigoPorcentaje&gt;4&lt;/codigoPorcentaje&gt;
+		&lt;baseImponible&gt;347.20&lt;/baseImponible&gt;
+		&lt;tarifa&gt;15.00&lt;/tarifa&gt;
+		&lt;valorImpuesto&gt;52.08&lt;/valorImpuesto&gt;
+	&lt;/impuestoDocSustento&gt;
+	&lt;/impuestosDocSustento&gt;
+	&lt;retenciones&gt;
+	&lt;retencion&gt;
+			&lt;codigo&gt;1&lt;/codigo&gt;
+			&lt;codigoRetencion&gt;312&lt;/codigoRetencion&gt;
+			&lt;baseImponible&gt;347.20&lt;/baseImponible&gt;
+			&lt;porcentajeRetener&gt;2.00&lt;/porcentajeRetener&gt;
+			&lt;valorRetenido&gt;6.94&lt;/valorRetenido&gt;
+	&lt;/retencion&gt;
+	&lt;/retenciones&gt;
+	&lt;pagos&gt;
+		&lt;pago&gt;
+			&lt;formaPago&gt;20&lt;/formaPago&gt;
+			&lt;total&gt;392.34&lt;/total&gt;
+		&lt;/pago&gt;
+	&lt;/pagos&gt;
+	&lt;/docSustento&gt;
+&lt;/docsSustento&gt;
+&lt;infoAdicional&gt;
+	&lt;campoAdicional nombre="Retencion"&gt; AGENTE DE RETENCION RESOLUCION NAC-DNCRASC201&lt;/campoAdicional&gt;
+	&lt;campoAdicional nombre="DireccionProveedor"&gt; SANTO DOMINGO &lt;/campoAdicional&gt;
+&lt;/infoAdicional&gt;
+&lt;ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#" xmlns:etsi="http://uri.etsi.org/01903/v1.3.2#" Id="Signature920336"&gt;
+&lt;ds:SignedInfo Id="Signature-SignedInfo971901"&gt;
+&lt;ds:CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"&gt;&lt;/ds:CanonicalizationMethod&gt;
+&lt;ds:SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"&gt;&lt;/ds:SignatureMethod&gt;
+&lt;ds:Reference Id="SignedPropertiesID524707" Type="http://uri.etsi.org/01903#SignedProperties" URI="#Signature920336-SignedProperties624427"&gt;
+&lt;ds:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"&gt;&lt;/ds:DigestMethod&gt;
+&lt;ds:DigestValue&gt;RvnYLwheu65jybdBtbiar9C+f/E=&lt;/ds:DigestValue&gt;
+&lt;/ds:Reference&gt;
+&lt;ds:Reference URI="#Certificate1417821"&gt;
+&lt;ds:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"&gt;&lt;/ds:DigestMethod&gt;
+&lt;ds:DigestValue&gt;M0YuxtYhIHUjmj+FrsmEpDSTFUM=&lt;/ds:DigestValue&gt;
+&lt;/ds:Reference&gt;
+&lt;ds:Reference Id="Reference-ID-395816" URI="#comprobante"&gt;
+&lt;ds:Transforms&gt;
+&lt;ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"&gt;&lt;/ds:Transform&gt;
+&lt;/ds:Transforms&gt;
+&lt;ds:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"&gt;&lt;/ds:DigestMethod&gt;
+&lt;ds:DigestValue&gt;Jod90ymYKXlGTp5QQGXz+dirLr4=&lt;/ds:DigestValue&gt;
+&lt;/ds:Reference&gt;
+&lt;/ds:SignedInfo&gt;
+&lt;ds:SignatureValue Id="SignatureValue661110"&gt;
+OWSBSnUsgJKKvIol58V3AcyrzlC53mpAycqchcMc/JE0PZJaWmxP0RCXexLXkwgBruLaPc9/5vuF
+QpzZ/d/vfHPxxO4Pxn5YIUQ0m0bXCpLIpGRe6PKNl1V5POjkzaevfIvl3/V7BS4nYZpxLbW+gXk5
+Hi037cRZDypbaXIj2B06FT6aVpMvLB1qU+xiLKGubJbq5tBkom8yogLIO8Q3ULyaWdsORcBP4zM2
+M2E+ihqa8DySRKbfcSnW5tZq5DJ6ANdX/eNM82nKMOKrV3XV1o58uJO+zPZ0njHSbP4L7YgpiDwv
+jK9HnDh+A6lJuGkAfhfmIozeR3YTyn8Us+wvlQ==
+&lt;/ds:SignatureValue&gt;
+&lt;ds:KeyInfo Id="Certificate1417821"&gt;
+&lt;ds:X509Data&gt;
+&lt;ds:X509Certificate&gt;
+MIIHwTCCBamgAwIBAgIRAPmn5kJTjXm0+dRLysVEgwAwDQYJKoZIhvcNAQELBQAwgcIxCzAJBgNV
+BAYTAkVDMRswGQYDVQQKDBJGSVJNQVNFR1VSQSBTLkEuUy4xMDAuBgNVBAsMJ0VOVElEQUQgREUg
+Q0VSVElGSUNBQ0lPTiBERSBJTkZPUk1BQ0lPTjETMBEGA1UECAwKVFVOR1VSQUhVQTE+MDwGA1UE
+Aww1QVVUT1JJREFEIERFIENFUlRJRklDQUNJT04gU1VCQ0EtMSBGSVJNQVNFR1VSQSBTLkEuUy4x
+DzANBgNVBAcMBkFNQkFUTzAeFw0yNDEyMDUxNTA0MTJaFw0yOTEyMDUxNjA0MTJaMIHaMS0wKwYD
+VQQFEyQ1ZTFjODNjYS0xOTY0LTQxMjAtYjkzNi0wODM1NWQyZmFlZGQxJzAlBgkqhkiG9w0BCQEW
+GGNlLnZpY2hpdG8yMEBob3RtYWlsLmNvbTEkMCIGA1UEAwwbSk9SR0UgSVZBTiBDQVNUQcORTyBa
+VUxVQUdBMTAwLgYDVQQLEydFTlRJREFEIERFIENFUlRJRklDQUNJT04gREUgSU5GT1JNQUNJT04x
+GzAZBgNVBAoTEkZJUk1BU0VHVVJBIFMuQS5TLjELMAkGA1UEBhMCRUMwggEiMA0GCSqGSIb3DQEB
+AQUAA4IBDwAwggEKAoIBAQCMSMld/V7911D6xOglI/0hWXNtwfj8S3al6kzd89keALp/4GT6I/+y
+fI9zJkRAgd6DFY6Bj6vCjQiH3DmFMVvLiE9/FDpUv9eTv+H1cADtCOV+HVf2Farl6ub0qjSISdM7
+3zryvRq8D8lWvEE2BUmCFskJuB3XWEU+j0gDzoTIAgUz3A3abXLzVzo5X7hkb7hpAMPLuPvZLzU/
+XonIBl6NRAwVttHq44Z9ShZCyB6NXIc+4KeXJuiBpa+PfyNx9CGCf/J6dHhLJeGHgmhS0Z0QOPag
+vTDtaM6J7Lqzc9qR2U9hDsZrNgikKg6fShMIzHmwdhY21Lx+ETQ3AGguC9MBAgMBAAGjggKWMIIC
+kjAJBgNVHRMEAjAAMB8GA1UdIwQYMBaAFBNGk2gJrtckhzNFYyZ336xeXopRMB0GA1UdDgQWBBT+
+JrZjsW8FY7iM6atcgT3WobXKNDBaBgNVHR8EUzBRME+gTaBLhklodHRwOi8vY3JsLmZpcm1hc2Vn
+dXJhZWMuY29tL2NybC9jY2NlNWE0Zi02YjY4LTQ2ZmMtYTYyMC00YWJjYzRjNGE2OTAuY3JsMDkG
+CCsGAQUFBwEBBC0wKzApBggrBgEFBQcwAYYdaHR0cDovL29jc3AuZmlybWFzZWd1cmFlYy5jb20w
+GgYKKwYBBAGD3nkDAQQMFgowOTI3ODI3MzI5MBoGCisGAQQBg955AwIEDBYKSk9SR0UgSVZBTjAX
+BgorBgEEAYPeeQMDBAkWB0NBU1RB0U8wFwYKKwYBBAGD3nkDBAQJFgdaVUxVQUdBMCoGCisGAQQB
+g955AwcEHBYaRlJFTlRFIEFMIFBBUlFVRSBFTCBWRUxFUk8wHAYKKwYBBAGD3nkDCAQOFgw1OTM5
+OTY1NjQ4NTIwFwYKKwYBBAGD3nkDCQQJFgdRVUVWRURPMBMGCisGAQQBg955AwwEBRYDRUNVMB0G
+CisGAQQBg955AwsEDxYNMDkyNzgyNzMyOTAwMTCBnAYDVR0gBIGUMIGRMFAGCysGAQQBg955AgEB
+MEEwPwYIKwYBBQUHAgEWM2h0dHBzOi8vZmlybWFzZWd1cmFlYy5jb20vcG9saXRpY2FzX3BlcnNv
+bmFfbmF0dXJhbDA9BgsrBgEEAYPeeQICATAuMCwGCCsGAQUFBwICMCAMHkNlcnRpZmljYWRvIGRl
+IFBlcnNvbmEgTmF0dXJhbDAOBgNVHQ8BAf8EBAMCBeAwDQYJKoZIhvcNAQELBQADggIBADggx+pA
+MWPFZrzvW6vFnJOKlJSzXQl+ntAHIHQ+91KIQjL+V8DYgeuOwZOnwpkzXsxGIAySIr5ZD4RWnr26
+QjBxqLU7UJ7tavq+Ioy70uWnewPQPr/V/QUTLdbYIEoUFR263QJ1RqzYSAvEghCCNyuNKdGT4A2s
+3T/WnOjYt1H1oRSluDUt23N7mSP1k63sMW14kkixPe29sl3sbZVcboPAwgcnZS58Icc+jEcz7Sfm
+YLOsBfa/iFZzEoYkohQTTHlc7cfFyAiOYZpKWhEP/wDsBzoMnlne5XSrDkK3W25e9kV940UMYTw1
+Dy/WFQlX2jPtNE2XDxRWVw4FKKkFF3tINS7hkbhS2Bgf41zdHil92oK1dHboRQoiM0Emy62Qn4JD
+mgfKnNTZOlEhSUcE/3dOM4qfPTbAIf1N08NOxpNpNNNOYm6/5huJqAGwwezxYAWcW68dgQ7+f33i
+SXXQv9v5cS9xfDAkXovzz7yUsT4iVkT8vCmDiyLl7lvoO1o8i2rmv4svNZN6wPBiXleUs5UF3Q4e
+ErCORDPmoJU+r/tOU+ymLhJDwXhjEVNYyQqxnDBHVhXrWNQ8S05MBkB/HprqNi0v+8X46C+2cRUb
+L8N3x7unsiyxihysU9xRB5zNEKsTQ/fYyKCMQBE4y0AtU5aC+IqQ2yaALZz7aff7MZog
+&lt;/ds:X509Certificate&gt;
+&lt;/ds:X509Data&gt;
+&lt;ds:KeyValue&gt;
+&lt;ds:RSAKeyValue&gt;
+&lt;ds:Modulus&gt;
+jEjJXf1e/ddQ+sToJSP9IVlzbcH4/Et2pepM3fPZHgC6f+Bk+iP/snyPcyZEQIHegxWOgY+rwo0I
+h9w5hTFby4hPfxQ6VL/Xk7/h9XAA7Qjlfh1X9hWq5erm9Ko0iEnTO9868r0avA/JVrxBNgVJghbJ
+Cbgd11hFPo9IA86EyAIFM9wN2m1y81c6OV+4ZG+4aQDDy7j72S81P16JyAZejUQMFbbR6uOGfUoW
+QsgejVyHPuCnlybogaWvj38jcfQhgn/yenR4SyXhh4JoUtGdEDj2oL0w7WjOiey6s3PakdlPYQ7G
+azYIpCoOn0oTCMx5sHYWNtS8fhE0NwBoLgvTAQ==
+&lt;/ds:Modulus&gt;
+&lt;ds:Exponent&gt;AQAB&lt;/ds:Exponent&gt;
+&lt;/ds:RSAKeyValue&gt;
+&lt;/ds:KeyValue&gt;
+&lt;/ds:KeyInfo&gt;
+&lt;ds:Object Id="Signature920336-Object101476"&gt;&lt;etsi:QualifyingProperties Target="#Signature920336"&gt;&lt;etsi:SignedProperties Id="Signature920336-SignedProperties624427"&gt;&lt;etsi:SignedSignatureProperties&gt;&lt;etsi:SigningTime&gt;2026-08-19T15:26:31-05:00&lt;/etsi:SigningTime&gt;&lt;etsi:SigningCertificate&gt;&lt;etsi:Cert&gt;&lt;etsi:CertDigest&gt;&lt;ds:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"&gt;&lt;/ds:DigestMethod&gt;&lt;ds:DigestValue&gt;jV4JApbijuNjl3FfxaMzQNpkrjg=&lt;/ds:DigestValue&gt;&lt;/etsi:CertDigest&gt;&lt;etsi:IssuerSerial&gt;&lt;ds:X509IssuerName&gt;L=AMBATO,CN=AUTORIDAD DE CERTIFICACION SUBCA-1 FIRMASEGURA S.A.S.,ST=TUNGURAHUA,OU=ENTIDAD DE CERTIFICACION DE INFORMACION,O=FIRMASEGURA S.A.S.,C=EC&lt;/ds:X509IssuerName&gt;&lt;ds:X509SerialNumber&gt;331849554734945223493154100795834401536&lt;/ds:X509SerialNumber&gt;&lt;/etsi:IssuerSerial&gt;&lt;/etsi:Cert&gt;&lt;/etsi:SigningCertificate&gt;&lt;/etsi:SignedSignatureProperties&gt;&lt;etsi:SignedDataObjectProperties&gt;&lt;etsi:DataObjectFormat ObjectReference="#Reference-ID-395816"&gt;&lt;etsi:Description&gt;contenido comprobante&lt;/etsi:Description&gt;&lt;etsi:MimeType&gt;text/xml&lt;/etsi:MimeType&gt;&lt;/etsi:DataObjectFormat&gt;&lt;/etsi:SignedDataObjectProperties&gt;&lt;/etsi:SignedProperties&gt;&lt;/etsi:QualifyingProperties&gt;&lt;/ds:Object&gt;&lt;/ds:Signature&gt;&lt;/comprobanteRetencion&gt;</comprobante><mensajes/></autorizacion>

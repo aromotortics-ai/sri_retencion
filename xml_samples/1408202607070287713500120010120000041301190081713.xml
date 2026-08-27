@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<autorizacion><estado>AUTORIZADO</estado><numeroAutorizacion>1408202607070287713500120010120000041301190081713</numeroAutorizacion><fechaAutorizacion>2026-08-14T10:08:05-05:00</fechaAutorizacion><ambiente>PRODUCCIÓN</ambiente><comprobante>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;comprobanteRetencion id="comprobante" version="2.0.0"&gt;
+	&lt;infoTributaria&gt;
+		&lt;ambiente&gt;2&lt;/ambiente&gt;
+		&lt;tipoEmision&gt;1&lt;/tipoEmision&gt;
+		&lt;razonSocial&gt;RAMON QUEZADA MANUEL BOLIVAR&lt;/razonSocial&gt;
+		&lt;nombreComercial&gt;FERRIBOLIVAR&lt;/nombreComercial&gt;
+		&lt;ruc&gt;0702877135001&lt;/ruc&gt;
+		&lt;claveAcceso&gt;1408202607070287713500120010120000041301190081713&lt;/claveAcceso&gt;
+		&lt;codDoc&gt;07&lt;/codDoc&gt;
+		&lt;estab&gt;001&lt;/estab&gt;
+		&lt;ptoEmi&gt;012&lt;/ptoEmi&gt;
+		&lt;secuencial&gt;000004130&lt;/secuencial&gt;
+		&lt;dirMatriz&gt;EL ORO / PASAJE / MACHALA ENTRE AZUAY Y ELOY ALFARO&lt;/dirMatriz&gt;
+		&lt;agenteRetencion&gt;1&lt;/agenteRetencion&gt;
+	&lt;/infoTributaria&gt;
+&lt;infoCompRetencion&gt;
+	&lt;fechaEmision&gt;14/08/2026&lt;/fechaEmision&gt;
+	&lt;dirEstablecimiento&gt;EL ORO / PASAJE / MACHALA ENTRE  AZUAY Y ELOY ALFARO&lt;/dirEstablecimiento&gt;
+	&lt;obligadoContabilidad&gt;SI&lt;/obligadoContabilidad&gt;
+	&lt;tipoIdentificacionSujetoRetenido&gt;04&lt;/tipoIdentificacionSujetoRetenido&gt;
+	&lt;parteRel&gt;NO&lt;/parteRel&gt;
+	&lt;razonSocialSujetoRetenido&gt;IMPOR EXPORT AROMOTOR CIA. LTDA.&lt;/razonSocialSujetoRetenido&gt;
+	&lt;identificacionSujetoRetenido&gt;2390000831001&lt;/identificacionSujetoRetenido&gt;
+	&lt;periodoFiscal&gt;08/2026&lt;/periodoFiscal&gt;
+&lt;/infoCompRetencion&gt;
+&lt;docsSustento&gt;
+&lt;docSustento&gt;
+	&lt;codSustento&gt;07&lt;/codSustento&gt;
+	&lt;codDocSustento&gt;01&lt;/codDocSustento&gt;
+	&lt;numDocSustento&gt;001003000089644&lt;/numDocSustento&gt;
+	&lt;fechaEmisionDocSustento&gt;12/08/2026&lt;/fechaEmisionDocSustento&gt;
+	&lt;fechaRegistroContable&gt;14/08/2026&lt;/fechaRegistroContable&gt;
+	&lt;numAutDocSustento&gt;1208202601239000083100120010030000896440008964415&lt;/numAutDocSustento&gt;
+	&lt;pagoLocExt&gt;01&lt;/pagoLocExt&gt;
+	&lt;paisEfecPago&gt;593&lt;/paisEfecPago&gt;
+	&lt;totalSinImpuestos&gt;302.05&lt;/totalSinImpuestos&gt;
+	&lt;importeTotal&gt;347.36&lt;/importeTotal&gt;
+&lt;impuestosDocSustento&gt;
+&lt;impuestoDocSustento&gt;
+	&lt;codImpuestoDocSustento&gt;2&lt;/codImpuestoDocSustento&gt;
+	&lt;codigoPorcentaje&gt;4&lt;/codigoPorcentaje&gt;
+	&lt;baseImponible&gt;302.05&lt;/baseImponible&gt;
+	&lt;tarifa&gt;15&lt;/tarifa&gt;
+	&lt;valorImpuesto&gt;45.30&lt;/valorImpuesto&gt;
+&lt;/impuestoDocSustento&gt;
+&lt;/impuestosDocSustento&gt;
+&lt;retenciones&gt;
+	&lt;retencion&gt;
+		&lt;codigo&gt;2&lt;/codigo&gt;
+		&lt;codigoRetencion&gt;7&lt;/codigoRetencion&gt;
+		&lt;baseImponible&gt;45.31&lt;/baseImponible&gt;
+		&lt;porcentajeRetener&gt;0&lt;/porcentajeRetener&gt;
+		&lt;valorRetenido&gt;0.00&lt;/valorRetenido&gt;
+	&lt;/retencion&gt;
+	&lt;retencion&gt;
+		&lt;codigo&gt;1&lt;/codigo&gt;
+		&lt;codigoRetencion&gt;312&lt;/codigoRetencion&gt;
+		&lt;baseImponible&gt;295.42&lt;/baseImponible&gt;
+		&lt;porcentajeRetener&gt;2.00&lt;/porcentajeRetener&gt;
+		&lt;valorRetenido&gt;5.91&lt;/valorRetenido&gt;
+	&lt;/retencion&gt;
+	&lt;retencion&gt;
+		&lt;codigo&gt;1&lt;/codigo&gt;
+		&lt;codigoRetencion&gt;3440&lt;/codigoRetencion&gt;
+		&lt;baseImponible&gt;6.63&lt;/baseImponible&gt;
+		&lt;porcentajeRetener&gt;3.00&lt;/porcentajeRetener&gt;
+		&lt;valorRetenido&gt;0.20&lt;/valorRetenido&gt;
+	&lt;/retencion&gt;
+&lt;/retenciones&gt;
+&lt;pagos&gt;
+	&lt;pago&gt;
+		&lt;formaPago&gt;20&lt;/formaPago&gt;
+		&lt;total&gt;347.36&lt;/total&gt;
+	&lt;/pago&gt;
+&lt;/pagos&gt;
+&lt;/docSustento&gt;
+&lt;/docsSustento&gt;
+&lt;infoAdicional&gt;
+	&lt;campoAdicional nombre="Direccion"&gt;SANTO DOMINGO DE LOS TSACHILAS, CALLE CAMINO A LA BENGALA Y AV LOS COLONOS&lt;/campoAdicional&gt;
+	&lt;campoAdicional nombre="Telefono"&gt;0962909404&lt;/campoAdicional&gt;
+	&lt;campoAdicional nombre="Email"&gt;cobraimportacionesmachala@gmail.com&lt;/campoAdicional&gt;
+&lt;/infoAdicional&gt;
+&lt;ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#" xmlns:etsi="http://uri.etsi.org/01903/v1.3.2#" Id="Signature639464"&gt;
+&lt;ds:SignedInfo Id="Signature-SignedInfo9041"&gt;
+&lt;ds:CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"&gt;&lt;/ds:CanonicalizationMethod&gt;
+&lt;ds:SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"&gt;&lt;/ds:SignatureMethod&gt;
+&lt;ds:Reference Id="SignedPropertiesID419344" Type="http://uri.etsi.org/01903#SignedProperties" URI="#Signature639464-SignedProperties263616"&gt;
+&lt;ds:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"&gt;&lt;/ds:DigestMethod&gt;
+&lt;ds:DigestValue&gt;8dAnxcUUbwBQDN6SZTPtUEJPEsM=&lt;/ds:DigestValue&gt;
+&lt;/ds:Reference&gt;
+&lt;ds:Reference URI="#Certificate1923900"&gt;
+&lt;ds:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"&gt;&lt;/ds:DigestMethod&gt;
+&lt;ds:DigestValue&gt;HRb34elZruU0mXqwrCjkLpBggbY=&lt;/ds:DigestValue&gt;
+&lt;/ds:Reference&gt;
+&lt;ds:Reference Id="Reference-ID-845416" URI="#comprobante"&gt;
+&lt;ds:Transforms&gt;
+&lt;ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"&gt;&lt;/ds:Transform&gt;
+&lt;/ds:Transforms&gt;
+&lt;ds:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"&gt;&lt;/ds:DigestMethod&gt;
+&lt;ds:DigestValue&gt;dOyNftY1bXahJFcwm5Y7CHJWroE=&lt;/ds:DigestValue&gt;
+&lt;/ds:Reference&gt;
+&lt;/ds:SignedInfo&gt;
+&lt;ds:SignatureValue Id="SignatureValue933082"&gt;
+Bue9gOzg+3Kxe/sbZMCTgkMhyEyV5wJyShDSWU+Znj3bNsQIdpbBXXoPnXRFv73sghW+2Lg3+MP7
+8rRsjoXk1HJ+sPrMIQRypmsq4vxbD+x/wQnnCbQ86xC95JLA1vExhK7LNLMhILqbEXHTWQkMtwP6
+d0YKKVVi6pqgvx4wZAufbUj1eYSz5o5fWgfeChvfMVkZZ51eV1Z/nOiCZKckQLLm/AU2FrSFZeyb
+FwDETitj+L2TZRL3erLBdn7WpAdIfInLkIuKooR3kkjGSFOozNUT/ncurFDz8l/fSZ8X7mRQhVC2
+HX/Db88RD1c7QT8VA83B/h8sDSGoq+uaa/wB4A==
+&lt;/ds:SignatureValue&gt;
+&lt;ds:KeyInfo Id="Certificate1923900"&gt;
+&lt;ds:X509Data&gt;
+&lt;ds:X509Certificate&gt;
+MIIJIjCCBwqgAwIBAgIIeLBVM3bqxtAwDQYJKoZIhvcNAQELBQAwgbgxCzAJBgNVBAYTAkVTMUQw
+QgYDVQQHDDtCYXJjZWxvbmEgKHNlZSBjdXJyZW50IGFkZHJlc3MgYXQgd3d3LnVhbmF0YWNhLmNv
+bS9hZGRyZXNzKTEWMBQGA1UECgwNVUFOQVRBQ0EgUy5BLjEVMBMGA1UECwwMVFNQLVVBTkFUQUNB
+MRowGAYDVQQDDBFVQU5BVEFDQSBDQTIgMjAxNjEYMBYGA1UEYQwPVkFURVMtQTY2NzIxNDk5MB4X
+DTI0MTAyMjE0MzgwMFoXDTI2MTAyMjE0MzgwMFowgZ4xCzAJBgNVBAYTAkVDMRYwFAYDVQQEDA1S
+QU1PTiBRVUVaQURBMRcwFQYDVQQqDA5NQU5VRUwgQk9MSVZBUjEZMBcGA1UEBRMQSURDRUMtMDcw
+Mjg3NzEzNTElMCMGA1UEAwwcTUFOVUVMIEJPTElWQVIgUkFNT04gUVVFWkFEQTEcMBoGA1UEYQwT
+VElORUMtMDcwMjg3NzEzNTAwMTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAIgBz4yV
+ZkrVilu1Gq/p1jyXJQQTtKh9HJ7Mdun97CW+yJERF50AAtRjT9iuffsX2dRGepOZIM9RPOs24Umn
+KVO9CluooFpFW68YvttB89UdjqGQ3TgfRdTsjKiRhhico8Vu8tzDWGVINhnVCqmf1dQVisVlR07A
+cJ1AzbddWOnCHOP7n9hR414AegIM9R2lw89Y130KW1efbPuA9Ev6Ml4lMVB6OKAL4tDJGOP0T033
+y8Md/2JGZI8Hb8Ey3BpefMV/K2kpSqJwAIOErxMeK+dzfZMzcPVU+f2qhmXUgO0bymvYW+xaVWVm
+7q8mJT5h2yk7/CKINz/vyTC3gVJV1PcCAwEAAaOCBEYwggRCMBsGCysGAQQBgvE2ZgMBBAwMCjA3
+MDI4NzcxMzUwHgYLKwYBBAGC8TZmAwsEDwwNMDcwMjg3NzEzNTAwMTCB1wYIKwYBBQUHAQEEgcow
+gccwVQYIKwYBBQUHMAKGSWh0dHA6Ly93d3cudWFuYXRhY2EuY29tL3B1YmxpYy9kb3dubG9hZC90
+c3BfY2VydGlmaWNhdGVzL3N1Ym9yZGluYXRlMS5jcnQwNgYIKwYBBQUHMAGGKmh0dHA6Ly9vY3Nw
+MS51YW5hdGFjYS5jb20vcHVibGljL3BraS9vY3NwLzA2BggrBgEFBQcwAYYqaHR0cDovL29jc3Ay
+LnVhbmF0YWNhLmNvbS9wdWJsaWMvcGtpL29jc3AvMB0GA1UdDgQWBBSo0VtoASq+yJm6WAMxANN/
+N3c30jAMBgNVHRMBAf8EAjAAMB8GA1UdIwQYMBaAFH1X52BzzgdGqeKjaPDhEbJ0knP9MIGZBgNV
+HSAEgZEwgY4wgYsGDCsGAQQBgvE2ZgIBATB7MDcGCCsGAQUFBwIBFitodHRwczovL3d3dy51YW5h
+dGFjYS5jb20vcHVibGljL3BraS9kcGMtZWMvMEAGCCsGAQUFBwICMDQMMkNFUlRJRklDQURPIERF
+IFBFUlNPTkEgTkFUVVJBTCBPIEZJU0lDQSBFTiBBUkNISVZPMIGPBgNVHR8EgYcwgYQwQKA+oDyG
+Omh0dHA6Ly9jcmwxLnVhbmF0YWNhLmNvbS9wdWJsaWMvcGtpL2NybC9DQTJzdWJvcmRpbmFkYS5j
+cmwwQKA+oDyGOmh0dHA6Ly9jcmwyLnVhbmF0YWNhLmNvbS9wdWJsaWMvcGtpL2NybC9DQTJzdWJv
+cmRpbmFkYS5jcmwwDgYDVR0PAQH/BAQDAgXgMB0GA1UdJQQWMBQGCCsGAQUFBwMCBggrBgEFBQcD
+BDCCAXwGA1UdEQSCAXMwggFvgRZvbGVzaXN0ZW1hc2NAZ21haWwuY29toBsGCysGAQQBgvE2ZgMB
+oAwMCjA3MDI4NzcxMzWgHwYLKwYBBAGC8TZmAwKgEAwOTUFOVUVMIEJPTElWQVKgFgYLKwYBBAGC
+8TZmAwOgBwwFUkFNT06gGAYLKwYBBAGC8TZmAwSgCQwHUVVFWkFEQaAxBgsrBgEEAYLxNmYDB6Ai
+DCBNQUNIQUxBXCwgU04gQVpVQVkgWSBFTE9ZIEFMRkFST6AfBgsrBgEEAYLxNmYDCKAQDA4wMDU5
+Mzk2MjUyMTM3NKAXBgsrBgEEAYLxNmYDCaAIDAZQQVNBSkWgHgYLKwYBBAGC8TZmAwugDwwNMDcw
+Mjg3NzEzNTAwMaATBgsrBgEEAYLxNmYDDKAEDAJFQ6ApBgsrBgEEAYLxNmYDMqAaDBhQRVJTT05B
+IE5BVFVSQUwgTyBGSVNJQ0GgGAYLKwYBBAGC8TZmAzOgCQwHQVJDSElWTzANBgkqhkiG9w0BAQsF
+AAOCAgEAVtrkdFqUhiGcYe32TErB6HLpyl2R4ccg0xpfmnBg2b6NWxj6gziwWi7eD1cYFxtJP1+Q
+rhu1ijr3mD7KcVMXilD+QxPxS0GisOQctEPqdk0nBI+j/xkAZfHEkjP4+IqnOyeyJTjEyF5I5uIh
+GtkOEimDkscYc8pnZA6cjmyDTYYw7HAckIlxpGq5VRUfz8BGF/gk6G1WavPndqeftQuQ66bamKGo
+uHJ6fgvUwtgmLMbH+SZqwp1n9HYo/Rdo8FcbHqh35HfKhQvRwI396FKRA3sHsWawStaYKNBnlR1a
+uzrEUEy0HdprKcW2jsPgJgo9NiVCinxBuqUB7aL6u/m+LXh6IrHQycq61M8FE9uLdhDolBQyeOPA
+elFofEl9/DhxE4lOLSYvLrut1W4vySoonqoENBaHdRF+5W0AEuv4x2+TBYqkKoIA7VqRl+FsHfwg
+HtTkDKFvpz14UbhNw/thJ6CDG7jjupfbZO/a+i7l2HWga1udVJc4JfkkNh35ZoY4V5kbSjRQNWxF
+bTFAchUilLqUTWtndscTH3U2229PHTCvB7Uo6fSAn4luIJnwlHbvn44u6mlV1Y5yFMk2NGex9IL4
+8/aKZyFfVfx36OQMNqi0w5ffNGYEM/F0JkrzykE2+u+Ywufhf8mfrhKI1RvUDKjrQd2UbrRC78wx
+cMuX1xk=
+&lt;/ds:X509Certificate&gt;
+&lt;/ds:X509Data&gt;
+&lt;ds:KeyValue&gt;
+&lt;ds:RSAKeyValue&gt;
+&lt;ds:Modulus&gt;
+iAHPjJVmStWKW7Uar+nWPJclBBO0qH0cnsx26f3sJb7IkREXnQAC1GNP2K59+xfZ1EZ6k5kgz1E8
+6zbhSacpU70KW6igWkVbrxi+20Hz1R2OoZDdOB9F1OyMqJGGGJyjxW7y3MNYZUg2GdUKqZ/V1BWK
+xWVHTsBwnUDNt11Y6cIc4/uf2FHjXgB6Agz1HaXDz1jXfQpbV59s+4D0S/oyXiUxUHo4oAvi0MkY
+4/RPTffLwx3/YkZkjwdvwTLcGl58xX8raSlKonAAg4SvEx4r53N9kzNw9VT5/aqGZdSA7RvKa9hb
+7FpVZWburyYlPmHbKTv8Iog3P+/JMLeBUlXU9w==
+&lt;/ds:Modulus&gt;
+&lt;ds:Exponent&gt;AQAB&lt;/ds:Exponent&gt;
+&lt;/ds:RSAKeyValue&gt;
+&lt;/ds:KeyValue&gt;
+&lt;/ds:KeyInfo&gt;
+&lt;ds:Object Id="Signature639464-Object284700"&gt;&lt;etsi:QualifyingProperties Target="#Signature639464"&gt;&lt;etsi:SignedProperties Id="Signature639464-SignedProperties263616"&gt;&lt;etsi:SignedSignatureProperties&gt;&lt;etsi:SigningTime&gt;2026-08-14T10:08:03-05:00&lt;/etsi:SigningTime&gt;&lt;etsi:SigningCertificate&gt;&lt;etsi:Cert&gt;&lt;etsi:CertDigest&gt;&lt;ds:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"&gt;&lt;/ds:DigestMethod&gt;&lt;ds:DigestValue&gt;r4hBeH3j4dXiTCmqG4nNJsI0pHg=&lt;/ds:DigestValue&gt;&lt;/etsi:CertDigest&gt;&lt;etsi:IssuerSerial&gt;&lt;ds:X509IssuerName&gt;2.5.4.97=#0c0f56415445532d413636373231343939,CN=UANATACA CA2 2016,OU=TSP-UANATACA,O=UANATACA S.A.,L=Barcelona (see current address at www.uanataca.com/address),C=ES&lt;/ds:X509IssuerName&gt;&lt;ds:X509SerialNumber&gt;8696544559979218640&lt;/ds:X509SerialNumber&gt;&lt;/etsi:IssuerSerial&gt;&lt;/etsi:Cert&gt;&lt;/etsi:SigningCertificate&gt;&lt;/etsi:SignedSignatureProperties&gt;&lt;etsi:SignedDataObjectProperties&gt;&lt;etsi:DataObjectFormat ObjectReference="#Reference-ID-845416"&gt;&lt;etsi:Description&gt;contenido comprobante&lt;/etsi:Description&gt;&lt;etsi:MimeType&gt;text/xml&lt;/etsi:MimeType&gt;&lt;/etsi:DataObjectFormat&gt;&lt;/etsi:SignedDataObjectProperties&gt;&lt;/etsi:SignedProperties&gt;&lt;/etsi:QualifyingProperties&gt;&lt;/ds:Object&gt;&lt;/ds:Signature&gt;&lt;/comprobanteRetencion&gt;</comprobante><mensajes/></autorizacion>

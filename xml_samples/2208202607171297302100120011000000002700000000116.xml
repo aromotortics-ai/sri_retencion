@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<autorizacion><estado>AUTORIZADO</estado><numeroAutorizacion>2208202607171297302100120011000000002700000000116</numeroAutorizacion><fechaAutorizacion>2026-08-22T13:58:36-05:00</fechaAutorizacion><ambiente>PRODUCCIÓN</ambiente><comprobante>&lt;?xml version="1.0" encoding="UTF-8" standalone="no"?&gt;&lt;comprobanteRetencion id="comprobante" version="2.0.0"&gt;
+  &lt;infoTributaria&gt;
+    &lt;ambiente&gt;2&lt;/ambiente&gt;
+    &lt;tipoEmision&gt;1&lt;/tipoEmision&gt;
+    &lt;razonSocial&gt;RIVERA GONZALEZ LIMBER RENE&lt;/razonSocial&gt;
+    &lt;ruc&gt;1712973021001&lt;/ruc&gt;
+    &lt;claveAcceso&gt;2208202607171297302100120011000000002700000000116&lt;/claveAcceso&gt;
+    &lt;codDoc&gt;07&lt;/codDoc&gt;
+    &lt;estab&gt;001&lt;/estab&gt;
+    &lt;ptoEmi&gt;100&lt;/ptoEmi&gt;
+    &lt;secuencial&gt;000000270&lt;/secuencial&gt;
+    &lt;dirMatriz&gt;LA UNION / 12 DE OCTUBRE LOTE 1 Y EUGENIO ESPEJO&lt;/dirMatriz&gt;
+    &lt;agenteRetencion&gt;1&lt;/agenteRetencion&gt;
+  &lt;/infoTributaria&gt;
+  &lt;infoCompRetencion&gt;
+    &lt;fechaEmision&gt;22/08/2026&lt;/fechaEmision&gt;
+    &lt;dirEstablecimiento&gt;LA UNION / 12 DE OCTUBRE LOTE 1 Y EUGENIO ESPEJO&lt;/dirEstablecimiento&gt;
+    &lt;obligadoContabilidad&gt;SI&lt;/obligadoContabilidad&gt;
+    &lt;tipoIdentificacionSujetoRetenido&gt;04&lt;/tipoIdentificacionSujetoRetenido&gt;
+    &lt;parteRel&gt;NO&lt;/parteRel&gt;
+    &lt;razonSocialSujetoRetenido&gt;IMPOR EXPORT AROMOTOR CIA LTDA&lt;/razonSocialSujetoRetenido&gt;
+    &lt;identificacionSujetoRetenido&gt;2390000831001&lt;/identificacionSujetoRetenido&gt;
+    &lt;periodoFiscal&gt;08/2026&lt;/periodoFiscal&gt;
+  &lt;/infoCompRetencion&gt;
+  &lt;docsSustento&gt;
+    &lt;docSustento&gt;
+      &lt;codSustento&gt;01&lt;/codSustento&gt;
+      &lt;codDocSustento&gt;01&lt;/codDocSustento&gt;
+      &lt;numDocSustento&gt;001005000147069&lt;/numDocSustento&gt;
+      &lt;fechaEmisionDocSustento&gt;22/08/2026&lt;/fechaEmisionDocSustento&gt;
+      &lt;fechaRegistroContable&gt;22/08/2026&lt;/fechaRegistroContable&gt;
+      &lt;numAutDocSustento&gt;0000000000&lt;/numAutDocSustento&gt;
+      &lt;pagoLocExt&gt;01&lt;/pagoLocExt&gt;
+      &lt;totalSinImpuestos&gt;373.04&lt;/totalSinImpuestos&gt;
+      &lt;importeTotal&gt;373.04&lt;/importeTotal&gt;
+      &lt;impuestosDocSustento&gt;
+        &lt;impuestoDocSustento&gt;
+          &lt;codImpuestoDocSustento&gt;2&lt;/codImpuestoDocSustento&gt;
+          &lt;codigoPorcentaje&gt;0&lt;/codigoPorcentaje&gt;
+          &lt;baseImponible&gt;373.04&lt;/baseImponible&gt;
+          &lt;tarifa&gt;0.00&lt;/tarifa&gt;
+          &lt;valorImpuesto&gt;0.00&lt;/valorImpuesto&gt;
+        &lt;/impuestoDocSustento&gt;
+      &lt;/impuestosDocSustento&gt;
+      &lt;retenciones&gt;
+        &lt;retencion&gt;
+          &lt;codigo&gt;1&lt;/codigo&gt;
+          &lt;codigoRetencion&gt;312&lt;/codigoRetencion&gt;
+          &lt;baseImponible&gt;373.04&lt;/baseImponible&gt;
+          &lt;porcentajeRetener&gt;2.00&lt;/porcentajeRetener&gt;
+          &lt;valorRetenido&gt;7.46&lt;/valorRetenido&gt;
+        &lt;/retencion&gt;
+      &lt;/retenciones&gt;
+      &lt;pagos&gt;
+        &lt;pago&gt;
+          &lt;formaPago&gt;20&lt;/formaPago&gt;
+          &lt;total&gt;373.04&lt;/total&gt;
+        &lt;/pago&gt;
+      &lt;/pagos&gt;
+    &lt;/docSustento&gt;
+  &lt;/docsSustento&gt;
+  &lt;infoAdicional&gt;
+    &lt;campoAdicional nombre="email"&gt;cxccaromotor@gmail.com&lt;/campoAdicional&gt;
+    &lt;campoAdicional nombre="direccion"&gt;SANTO DOMINGO DE LOS TSACHILAS CALLE CAMIO A LA BENGALA&lt;/campoAdicional&gt;
+    &lt;campoAdicional nombre="telefono"&gt;032740240&lt;/campoAdicional&gt;
+    &lt;campoAdicional nombre="RUC Proveedor"&gt;2390651204001&lt;/campoAdicional&gt;
+  &lt;/infoAdicional&gt;
+&lt;ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#" xmlns:etsi="http://uri.etsi.org/01903/v1.3.2#" Id="Signature689043"&gt;
+&lt;ds:SignedInfo Id="Signature-SignedInfo248002"&gt;
+&lt;ds:CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/&gt;
+&lt;ds:SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/&gt;
+&lt;ds:Reference Id="SignedPropertiesID224416" Type="http://uri.etsi.org/01903#SignedProperties" URI="#Signature689043-SignedProperties847406"&gt;
+&lt;ds:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/&gt;
+&lt;ds:DigestValue&gt;fo8bKlBjK60hArFexjdflbHr7Yk=&lt;/ds:DigestValue&gt;
+&lt;/ds:Reference&gt;
+&lt;ds:Reference URI="#Certificate1810019"&gt;
+&lt;ds:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/&gt;
+&lt;ds:DigestValue&gt;gDPfPubJ6H4dQVYLyxoWubTI1kw=&lt;/ds:DigestValue&gt;
+&lt;/ds:Reference&gt;
+&lt;ds:Reference Id="Reference-ID-777056" URI="#comprobante"&gt;
+&lt;ds:Transforms&gt;
+&lt;ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/&gt;
+&lt;/ds:Transforms&gt;
+&lt;ds:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/&gt;
+&lt;ds:DigestValue&gt;C/Qvs45XQ+hbVUp/tH18QbcnXlE=&lt;/ds:DigestValue&gt;
+&lt;/ds:Reference&gt;
+&lt;/ds:SignedInfo&gt;
+&lt;ds:SignatureValue Id="SignatureValue863383"&gt;
+FJzBqpXHoyyN8RvP9KcA0FkwmzfxuMNxQb4CbO4YTAFHDQ2rXlGbSZFbxI8W1PTTa9Ox8Hvm6DT6
+X7fKWGLO0cE561t/HC+A4mqtEUz1fbA849SNf4+kUTePakH+ArO0Rjj3FtLdRVuJqCMa7EPp6gmS
+ejWh4tMff+hNI75Ma1htEqd/sJwoRBGbJlG9eDHEjzliawIsvK2HZ5G+eszwIXvXIGgD9cXctkXu
+acUoZcHyZh0yV60C7Q+tCOq67SvBI28QOsNULEKCLH3PUWZyPbeFncDyUNz1vU38G4h9B7f+Cwox
+7jIwCiimMnpjvw1DfbCgpthUawI0OHJNwIYlhA==
+&lt;/ds:SignatureValue&gt;
+&lt;ds:KeyInfo Id="Certificate1810019"&gt;
+&lt;ds:X509Data&gt;
+&lt;ds:X509Certificate&gt;
+MIIH7zCCBtegAwIBAgIFAMIC138wDQYJKoZIhvcNAQELBQAwRzELMAkGA1UEBhMCRUMxGzAZBgNV
+BAoMEkxhenphdGUgQ2lhLiBMdGRhLjEbMBkGA1UEAwwSTGF6emF0ZSBFbWlzb3IgQ0EyMB4XDTI1
+MTExNTIzNDIyNVoXDTI2MTExNTIzNDIyNVowgZUxCzAJBgNVBAYTAkVDMRswGQYDVQQKDBJMYXp6
+YXRlIENpYS4gTHRkYS4xHjAcBgNVBAsMFUVudGUgZGUgQ2VydGlmaWNhY2lvbjElMCMGA1UEAwwc
+TElNQkVSIFJFTkUgIFJJVkVSQSBHT05aQUxFWjEiMCAGCSqGSIb3DQEJARYTamFpcmMzMzEwQGdt
+YWlsLmNvbTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAKH6g48MqXsWb53yoJPlWzvv
+vIM9ekltiuZd9UpiuNNNoIhvAqpjAu0nsnnYXZLNvWxrabrOJQ1VilW8WzCCid0/OcXvWd+BtqiP
+jGx6e5TN9+i09sdA0BfxbM3Vj80vVlzBPUHtJvWzYqTAD8Zpgp40504Y18TB548qlheQnetLaNyv
+gBdYu88ioVJIdZO5ik8gvYEj6A+CWBTpM+X9bxlqLQ4EgoWP4avsbEOotvILfHAjtabvGhCCS/dZ
+oOEbppjOtuYx+bvpXspdpH/NvWweiMkAwbmnCrLvZ7ZjUBCg6zmP+qycJ7jBrbdQKZEr2LymRkPF
+2rNGZIMi6XnFzGMCAwEAAaOCBJEwggSNMBoGCisGAQQBg892AwEEDAwKMTcxMjk3MzAyMTAbBgor
+BgEEAYPPdgMCBA0MC0xJTUJFUiBSRU5FMBYGCisGAQQBg892AwMECAwGUklWRVJBMBgGCisGAQQB
+g892AwQECgwIR09OWkFMRVowLgYKKwYBBAGDz3YDBwQgDB5TQU5UTyBET01JTkdPIERFIExPUyBD
+T0xPUkFET1MwGgYKKwYBBAGDz3YDCAQMDAowOTk5MzY5ODA4MB0GCisGAQQBg892AwkEDwwNU0FO
+VE8gRE9NSU5HTzAXBgorBgEEAYPPdgMMBAkMB0VDVUFET1IwHQYKKwYBBAGDz3YDCwQPDA0xNzEy
+OTczMDIxMDAxMAwGA1UdEwEB/wQCMAAwHQYDVR0OBBYEFCiZ/8EP46+0tsdNAdK8HU5GzW82MB8G
+A1UdIwQYMBaAFO12SLAK8cmGhgxMRmTSBvjM1b0+MA4GA1UdDwEB/wQEAwIF4DA6BgNVHR8EMzAx
+MC+gLaArhilodHRwOi9lbmV4dDIueHl6L0xhenphdGVDQTIvZW1pc29yQ0EyLmNybDCCAYQGA1Ud
+IASCAXswggF3MHwGCisGAQQBg892AgEwbjBsBggrBgEFBQcCAjBgGl5FbCBwcmVzZW50ZSBjZXJ0
+aWZpY2FkbyBlcyBlbWl0aWRvIGVuIGJhc2UgYSBsYXMgcG9sw610aWNhcyBkZSBzZWd1cmlkYWQg
+ZGUgTGF6emF0ZSBDaWEuIEx0ZGEuMIH2BgkrBgEEAYPPdgIwgegwbAYIKwYBBQUHAgIwYBpeRWwg
+cHJlc2VudGUgY2VydGlmaWNhZG8gZXMgZW1pdGlkbyBlbiBiYXNlIGEgbGFzIHBvbMOtdGljYXMg
+ZGUgc2VndXJpZGFkIGRlIExhenphdGUgQ2lhLiBMdGRhLjB4BggrBgEFBQcCAjBsGmpFbCBwcmVz
+ZW50ZSBjZXJ0aWZpY2FkbyBzdWJvcmRpbmFkbyBlcyBlbWl0aWRvIGVuIGJhc2UgYSBsYXMgcG9s
+w610aWNhcyBkZSBzZWd1cmlkYWQgZGUgTGF6emF0ZSBDaWEuIEx0ZGEuMIIBGwYDVR0RBIIBEjCC
+AQ6gGgYKKwYBBAGDz3YDAaAMDAoxNzEyOTczMDIxoBsGCisGAQQBg892AwKgDQwLTElNQkVSIFJF
+TkWgFgYKKwYBBAGDz3YDA6AIDAZSSVZFUkGgGAYKKwYBBAGDz3YDBKAKDAhHT05aQUxFWqAuBgor
+BgEEAYPPdgMHoCAMHlNBTlRPIERPTUlOR08gREUgTE9TIENPTE9SQURPU6AaBgorBgEEAYPPdgMI
+oAwMCjA5OTkzNjk4MDigHQYKKwYBBAGDz3YDCaAPDA1TQU5UTyBET01JTkdPoBcGCisGAQQBg892
+AwygCQwHRUNVQURPUqAdBgorBgEEAYPPdgMLoA8MDTE3MTI5NzMwMjEwMDEwPAYIKwYBBQUHAQEE
+MDAuMCwGCCsGAQUFBzABhiBodHRwOi8vZW5leHQyLnh5ejo4Nzc3L2Fkc3Mvb2NzcDANBgkqhkiG
+9w0BAQsFAAOCAQEAsQqSJiY5k4j1xWtWYJUwU12eS3G2IDhgiL8FEV7MaQcTzm1btqgU4izY/60M
+iF+cMMBUqGSoeQQU9wQoGIyGU1yVrz0xbQ47rM1JKrAmeQbGHRqM3y7L4J98xrTwcS69Pxc3Aock
+D8Y/8ahWv1qKBLnbSNWft1Bz760EUuYJIWdiV373AyMNm9MENot1NaY+etQ3PlTMHLLDNSld7Jde
+ytLvrU613ml8klWPX4/3cyUTemw+f2+0MYT1sIMaDcnF5U6w293ZFT1iZuo5tVHJxyAChLtir2lZ
+GF7aAbPC0tDIwZLeeT7WIPBv0w7jszDw6VCPF3WMC4csTyJi4+aSHw==
+&lt;/ds:X509Certificate&gt;
+&lt;/ds:X509Data&gt;
+&lt;ds:KeyValue&gt;
+&lt;ds:RSAKeyValue&gt;
+&lt;ds:Modulus&gt;
+ofqDjwypexZvnfKgk+VbO++8gz16SW2K5l31SmK4002giG8CqmMC7Seyedhdks29bGtpus4lDVWK
+VbxbMIKJ3T85xe9Z34G2qI+MbHp7lM336LT2x0DQF/FszdWPzS9WXME9Qe0m9bNipMAPxmmCnjTn
+ThjXxMHnjyqWF5Cd60to3K+AF1i7zyKhUkh1k7mKTyC9gSPoD4JYFOkz5f1vGWotDgSChY/hq+xs
+Q6i28gt8cCO1pu8aEIJL91mg4RummM625jH5u+leyl2kf829bB6IyQDBuacKsu9ntmNQEKDrOY/6
+rJwnuMGtt1ApkSvYvKZGQ8Xas0ZkgyLpecXMYw==
+&lt;/ds:Modulus&gt;
+&lt;ds:Exponent&gt;AQAB&lt;/ds:Exponent&gt;
+&lt;/ds:RSAKeyValue&gt;
+&lt;/ds:KeyValue&gt;
+&lt;/ds:KeyInfo&gt;
+&lt;ds:Object Id="Signature689043-Object707290"&gt;&lt;etsi:QualifyingProperties Target="#Signature689043"&gt;&lt;etsi:SignedProperties Id="Signature689043-SignedProperties847406"&gt;&lt;etsi:SignedSignatureProperties&gt;&lt;etsi:SigningTime&gt;2026-08-22T13:58:34-05:00&lt;/etsi:SigningTime&gt;&lt;etsi:SigningCertificate&gt;&lt;etsi:Cert&gt;&lt;etsi:CertDigest&gt;&lt;ds:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/&gt;&lt;ds:DigestValue&gt;mkzIYf31/1vF+B2KHR3rUkbjhzM=&lt;/ds:DigestValue&gt;&lt;/etsi:CertDigest&gt;&lt;etsi:IssuerSerial&gt;&lt;ds:X509IssuerName&gt;CN=Lazzate Emisor CA2,O=Lazzate Cia. Ltda.,C=EC&lt;/ds:X509IssuerName&gt;&lt;ds:X509SerialNumber&gt;3254966143&lt;/ds:X509SerialNumber&gt;&lt;/etsi:IssuerSerial&gt;&lt;/etsi:Cert&gt;&lt;/etsi:SigningCertificate&gt;&lt;/etsi:SignedSignatureProperties&gt;&lt;etsi:SignedDataObjectProperties&gt;&lt;etsi:DataObjectFormat ObjectReference="#Reference-ID-777056"&gt;&lt;etsi:Description&gt;contenido comprobante&lt;/etsi:Description&gt;&lt;etsi:MimeType&gt;text/xml&lt;/etsi:MimeType&gt;&lt;/etsi:DataObjectFormat&gt;&lt;/etsi:SignedDataObjectProperties&gt;&lt;/etsi:SignedProperties&gt;&lt;/etsi:QualifyingProperties&gt;&lt;/ds:Object&gt;&lt;/ds:Signature&gt;&lt;/comprobanteRetencion&gt;</comprobante><mensajes/></autorizacion>
