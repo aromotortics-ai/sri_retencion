@@ -2,9 +2,185 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Conciliación SRI</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conciliación SRI · Retenciones</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f4f6f9; display: flex;
+           justify-content: center; align-items: center; min-height: 100vh; padding: 1rem; }
+    .card { background: white; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,.1);
+            padding: 2rem; width: 100%; max-width: 480px; }
+    h1 { color: #1F4E78; font-size: 1.3rem; margin-bottom: 0.25rem; }
+    .subtitle { color: #666; font-size: 0.85rem; margin-bottom: 1.5rem; }
+    .field { margin-bottom: 1rem; }
+    label { display: block; font-size: 0.85rem; color: #444; margin-bottom: 0.4rem; font-weight: bold; }
+    input[type=file] { width: 100%; border: 1px solid #ccc; border-radius: 4px;
+                       padding: 0.5rem; font-size: 0.85rem; cursor: pointer; }
+    button { width: 100%; padding: 0.75rem; background: #1F4E78; color: white;
+             border: none; border-radius: 4px; font-size: 1rem; cursor: pointer;
+             margin-top: 0.5rem; transition: background .2s; }
+    button:hover { background: #163d5f; }
+    button:disabled { background: #999; cursor: not-allowed; }
+    .progress-section { display: none; }
+    .status-msg { color: #444; font-size: 0.9rem; margin-bottom: 0.75rem; min-height: 1.2em; }
+    .bar-bg { background: #e0e7ef; border-radius: 4px; height: 12px; overflow: hidden; }
+    .bar-fill { background: #1F4E78; height: 100%; width: 0%; transition: width .4s ease;
+                border-radius: 4px; }
+    .elapsed { font-size: 0.78rem; color: #888; margin-top: 0.4rem; }
+    .result-section { display: none; }
+    .result-title { font-size: 1.1rem; color: #1a7a3c; font-weight: bold; margin-bottom: 1rem; }
+    .stat-grid { display: grid; grid-template-columns: 1fr auto; gap: 0.3rem 1rem;
+                 font-size: 0.88rem; margin-bottom: 1.25rem; }
+    .stat-label { color: #555; }
+    .stat-value { text-align: right; font-weight: bold; }
+    .stat-value.warn { color: #c0392b; }
+    .stat-value.ok { color: #1a7a3c; }
+    .btn-download { background: #1a7a3c; }
+    .btn-download:hover { background: #145c2d; }
+    .error-section { display: none; }
+    .error-title { color: #c0392b; font-weight: bold; margin-bottom: 0.75rem; }
+    .error-msg { background: #fdecea; border-radius: 4px; padding: 0.75rem;
+                 font-size: 0.82rem; color: #7b1c1c; white-space: pre-wrap;
+                 max-height: 120px; overflow-y: auto; margin-bottom: 1rem; }
+    .btn-retry { background: #888; }
+    .btn-retry:hover { background: #666; }
+  </style>
 </head>
 <body>
-  <h1>Conciliación de Comprobantes de Retención SRI</h1>
+<div class="card">
+  <h1>Conciliación SRI · Retenciones</h1>
+  <p class="subtitle">Sube los dos archivos y descarga el Excel de conciliación.</p>
+
+  <!-- Formulario -->
+  <div id="form-section">
+    <div class="field">
+      <label>1. Archivo TXT del portal SRI</label>
+      <input type="file" id="txt-file" accept=".txt">
+    </div>
+    <div class="field">
+      <label>2. Reporte de retenciones de Odoo (.xlsx)</label>
+      <input type="file" id="xlsx-file" accept=".xlsx">
+    </div>
+    <button id="btn-procesar" onclick="startJob()">Procesar</button>
+  </div>
+
+  <!-- Progreso -->
+  <div class="progress-section" id="progress-section">
+    <p class="status-msg" id="status-msg">Iniciando...</p>
+    <div class="bar-bg"><div class="bar-fill" id="bar-fill"></div></div>
+    <p class="elapsed" id="elapsed"></p>
+  </div>
+
+  <!-- Resultado -->
+  <div class="result-section" id="result-section">
+    <p class="result-title">&#x2705; Listo</p>
+    <div class="stat-grid" id="stat-grid"></div>
+    <button class="btn-download" id="btn-download">&#x2B07; Descargar Excel</button>
+    <button class="btn-retry" onclick="reset()" style="margin-top:.5rem;">Procesar otro período</button>
+  </div>
+
+  <!-- Error -->
+  <div class="error-section" id="error-section">
+    <p class="error-title">&#x274C; Error al procesar</p>
+    <div class="error-msg" id="error-msg"></div>
+    <button class="btn-retry" onclick="reset()">Intentar de nuevo</button>
+  </div>
+</div>
+
+<script>
+  let pollInterval = null;
+  let startTime   = null;
+  let currentJobId = null;
+
+  function show(id) {
+    ["form-section","progress-section","result-section","error-section"]
+      .forEach(s => document.getElementById(s).style.display = s === id ? "block" : "none");
+  }
+
+  async function startJob() {
+    const txt  = document.getElementById("txt-file").files[0];
+    const xlsx = document.getElementById("xlsx-file").files[0];
+    if (!txt || !xlsx) { alert("Selecciona ambos archivos."); return; }
+
+    document.getElementById("btn-procesar").disabled = true;
+    const fd = new FormData();
+    fd.append("recibidos", txt);
+    fd.append("reten_odoo", xlsx);
+
+    try {
+      const r = await fetch("/upload", { method: "POST", body: fd });
+      if (!r.ok) { throw new Error(`HTTP ${r.status}`); }
+      const { job_id } = await r.json();
+      currentJobId = job_id;
+      startTime = Date.now();
+      show("progress-section");
+      pollInterval = setInterval(() => poll(job_id), 5000);
+      poll(job_id);
+    } catch(e) {
+      alert("Error al subir archivos: " + e.message);
+      document.getElementById("btn-procesar").disabled = false;
+    }
+  }
+
+  async function poll(job_id) {
+    try {
+      const r = await fetch(`/status/${job_id}`);
+      if (!r.ok) return;
+      const data = await r.json();
+
+      document.getElementById("status-msg").textContent = data.mensaje || "";
+      document.getElementById("bar-fill").style.width = ((data.progreso || 0) * 100) + "%";
+
+      const elapsed = Math.round((Date.now() - startTime) / 1000);
+      const m = Math.floor(elapsed / 60), s = elapsed % 60;
+      document.getElementById("elapsed").textContent =
+        `Tiempo transcurrido: ${m}m ${String(s).padStart(2,"0")}s`;
+
+      if (data.estado === "done") {
+        clearInterval(pollInterval);
+        showResult(job_id, data.resumen);
+      } else if (data.estado === "error") {
+        clearInterval(pollInterval);
+        showError(data.mensaje || "Error desconocido");
+      }
+    } catch(e) { /* red temporalmente caída — reintentar en el siguiente tick */ }
+  }
+
+  function showResult(job_id, resumen) {
+    show("result-section");
+    const grid = document.getElementById("stat-grid");
+    const rows = [
+      ["Retenciones SRI",           resumen.n_listado,       ""],
+      ["XMLs descargados",          resumen.n_xml,           resumen.n_xml === resumen.n_listado ? "ok" : "warn"],
+      ["Líneas coinciden",          resumen.coinciden,       "ok"],
+      ["Solo en SRI · pendientes",  resumen.solo_sri,        resumen.solo_sri > 0 ? "warn" : "ok"],
+      ["Solo en Odoo · revisar",    resumen.solo_odoo,       resumen.solo_odoo > 0 ? "warn" : "ok"],
+      ["Factura incorrecta en Odoo",resumen.fac_incorrecta,  resumen.fac_incorrecta > 0 ? "warn" : "ok"],
+      ["Diferencias de valor",      resumen.diff_valor,      resumen.diff_valor > 0 ? "warn" : "ok"],
+    ];
+    grid.innerHTML = rows.map(([label, val, cls]) =>
+      `<span class="stat-label">${label}</span>` +
+      `<span class="stat-value ${cls}">${val ?? "&#x2014;"}</span>`
+    ).join("");
+    document.getElementById("btn-download").onclick = () => {
+      window.location = `/download/${job_id}`;
+    };
+  }
+
+  function showError(msg) {
+    show("error-section");
+    document.getElementById("error-msg").textContent = msg;
+  }
+
+  function reset() {
+    clearInterval(pollInterval);
+    currentJobId = null;
+    document.getElementById("txt-file").value = "";
+    document.getElementById("xlsx-file").value = "";
+    document.getElementById("btn-procesar").disabled = false;
+    document.getElementById("bar-fill").style.width = "0%";
+    show("form-section");
+  }
+</script>
 </body>
 </html>
