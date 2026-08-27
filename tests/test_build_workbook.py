@@ -13,6 +13,7 @@ def test_build_workbook_returns_stats(tmp_path):
     )
     assert "n_listado" in result
     assert "n_xml" in result
+    assert "n_pendientes" in result
     assert result["n_listado"] > 0
     assert Path(tmp_path / "out.xlsx").exists()
 
