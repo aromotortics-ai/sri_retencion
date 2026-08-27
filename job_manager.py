@@ -7,7 +7,7 @@ import json
 import uuid
 import shutil
 import threading
-from datetime import datetime
+from datetime import datetime, UTC
 from pathlib import Path
 
 JOBS_DIR = Path(__file__).parent / "jobs"
@@ -50,7 +50,7 @@ def write_status(
         "progreso": round(progreso, 3),
         "resumen":  resumen,
         "error":    error,
-        "ts":       datetime.utcnow().isoformat(),
+        "ts":       datetime.now(UTC).isoformat(),
     }
     status_file = get_job_dir(job_id) / "status.json"
     # Escritura atómica: escribir a .tmp y renombrar

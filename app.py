@@ -4,6 +4,7 @@ Endpoints: GET /, POST /upload, GET /status/{job_id}, GET /download/{job_id}
 Auth: HTTP Basic Auth contra users.yaml (bcrypt)
 """
 import threading
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
@@ -18,7 +19,14 @@ BASE_DIR    = Path(__file__).parent
 USERS_FILE  = str(BASE_DIR / "users.yaml")
 TEMPLATE    = BASE_DIR / "templates" / "index.html"
 
-app = FastAPI(title="Conciliación SRI", docs_url=None, redoc_url=None)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    mark_stale_jobs_as_error()
+    yield
+
+
+app = FastAPI(title="Conciliación SRI", docs_url=None, redoc_url=None, lifespan=lifespan)
 security = HTTPBasic()
 
 
@@ -30,11 +38,6 @@ def get_user(credentials: HTTPBasicCredentials = Depends(security)) -> str:
             headers={"WWW-Authenticate": "Basic"},
         )
     return credentials.username
-
-
-@app.on_event("startup")
-def startup():
-    mark_stale_jobs_as_error()
 
 
 @app.get("/", response_class=HTMLResponse)
