@@ -1,0 +1,12 @@
+pandas
+openpyxl
+requests
+certifi
+fastapi
+uvicorn[standard]
+gunicorn
+bcrypt
+pyyaml
+python-multipart
+pytest
+httpx

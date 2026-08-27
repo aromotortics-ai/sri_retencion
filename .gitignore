@@ -1,0 +1,8 @@
+users.yaml
+jobs/
+cache/xml/
+__pycache__/
+*.pyc
+.env
+*.xlsx
+claves_pendientes.txt
