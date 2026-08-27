@@ -1,0 +1,20 @@
+[Unit]
+Description=SRI Conciliacion Web App
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/sri_conciliacion
+ExecStart=/opt/sri_conciliacion/venv/bin/gunicorn app:app \
+    -w 2 \
+    -k uvicorn.workers.UvicornWorker \
+    --bind 127.0.0.1:8000 \
+    --timeout 30 \
+    --access-logfile /var/log/sri_conciliacion/access.log \
+    --error-logfile /var/log/sri_conciliacion/error.log
+Restart=on-failure
+RestartSec=5
+User=sri
+Group=sri
+
+[Install]
+WantedBy=multi-user.target
