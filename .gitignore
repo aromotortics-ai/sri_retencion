@@ -1,8 +1,12 @@
 users.yaml
 jobs/
-cache/xml/
+cache/
 __pycache__/
 *.pyc
 .env
 *.xlsx
+*.txt
+*.xml
+nginx.conf
 claves_pendientes.txt
+xml_samples/
