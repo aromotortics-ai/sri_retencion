@@ -16,7 +16,7 @@ from job_manager import create_job, read_status, get_job_dir, mark_stale_jobs_as
 from pipeline import run_pipeline
 
 BASE_DIR    = Path(__file__).parent
-USERS_FILE  = str(BASE_DIR / "users.yaml")
+USERS_FILE  = str(BASE_DIR / "data" / "users.yaml")
 TEMPLATE    = BASE_DIR / "templates" / "index.html"
 
 

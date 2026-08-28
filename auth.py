@@ -5,7 +5,7 @@ from pathlib import Path
 import bcrypt
 import yaml
 
-DEFAULT_USERS_FILE = str(Path(__file__).parent / "users.yaml")
+DEFAULT_USERS_FILE = str(Path(__file__).parent / "data" / "users.yaml")
 
 
 def verify_user(username: str, password: str, users_file: str = DEFAULT_USERS_FILE) -> bool:

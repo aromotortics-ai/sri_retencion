@@ -13,7 +13,7 @@ import bcrypt
 import yaml
 from pathlib import Path
 
-USERS_FILE = Path(__file__).parent / "users.yaml"
+USERS_FILE = Path(__file__).parent / "data" / "users.yaml"
 
 
 def load_users():

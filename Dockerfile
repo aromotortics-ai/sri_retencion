@@ -11,7 +11,7 @@ COPY *.py .
 COPY templates/ templates/
 
 # Crear directorios para volúmenes persistentes
-RUN mkdir -p cache/xml jobs
+RUN mkdir -p cache/xml jobs data
 
 EXPOSE 8000
 
