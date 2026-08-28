@@ -8,8 +8,9 @@ users.yaml
 jobs/
 cache/
 *.xlsx
-*.txt
 *.xml
+claves_*.txt
+2390000831001_*.txt
 deploy/
 docs/
 xml_samples/
