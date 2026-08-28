@@ -8,5 +8,6 @@ gunicorn
 bcrypt
 pyyaml
 python-multipart
+itsdangerous
 pytest
 httpx

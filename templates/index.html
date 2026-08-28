@@ -48,7 +48,10 @@
 </head>
 <body>
 <div class="card">
-  <h1>Conciliación SRI · Retenciones</h1>
+  <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.25rem;">
+    <h1>Conciliación SRI · Retenciones</h1>
+    <a href="/logout" style="font-size:0.78rem;color:#888;text-decoration:none;" title="Cerrar sesión">Salir</a>
+  </div>
   <p class="subtitle">Sube los dos archivos y descarga el Excel de conciliación.</p>
 
   <!-- Formulario -->
@@ -109,6 +112,7 @@
 
     try {
       const r = await fetch("/upload", { method: "POST", body: fd });
+      if (r.status === 401) { location = "/login"; return; }
       if (!r.ok) { throw new Error(`HTTP ${r.status}`); }
       const { job_id } = await r.json();
       currentJobId = job_id;
@@ -125,6 +129,7 @@
   async function poll(job_id) {
     try {
       const r = await fetch(`/status/${job_id}`);
+      if (r.status === 401) { clearInterval(pollInterval); location = "/login"; return; }
       if (!r.ok) return;
       const data = await r.json();
 
