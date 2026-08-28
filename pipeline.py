@@ -47,7 +47,7 @@ def run_pipeline(job_id: str) -> None:
 
         session = sri_session()
         ok = ya_cache
-        fallidos = []
+        fallidos = []  # lista de {"clave": str, "motivo": str}
 
         for i, clave in enumerate(pendientes):
             body = SOAP_TEMPLATE.format(clave=clave).encode("utf-8")
@@ -63,9 +63,17 @@ def run_pipeline(job_id: str) -> None:
                     )
                     ok += 1
                 else:
-                    fallidos.append(clave)
-            except Exception:
-                fallidos.append(clave)
+                    # Extraer mensaje de error que devuelve el SRI si existe
+                    estado_m = re.search(r"<estado>(.*?)</estado>", r.text)
+                    mens_m = re.search(r"<mensaje>(.*?)</mensaje>", r.text)
+                    motivo = "sin <autorizacion> en respuesta"
+                    if estado_m:
+                        motivo = f"SRI estado={estado_m.group(1)}"
+                    if mens_m:
+                        motivo += f" — {mens_m.group(1)}"
+                    fallidos.append({"clave": clave, "motivo": motivo})
+            except Exception as exc:
+                fallidos.append({"clave": clave, "motivo": f"{type(exc).__name__}: {exc}"})
             time.sleep(0.5)
 
             # Actualizar progreso cada 10 descargas
@@ -78,6 +86,13 @@ def run_pipeline(job_id: str) -> None:
                     msg += f", {ya_cache} desde caché"
                 msg += ")"
                 write_status(job_id, "running", msg, progreso)
+
+        # Guardar detalle de fallidos en el job dir para inspección posterior
+        if fallidos:
+            import json
+            (job_dir / "fallidos.json").write_text(
+                json.dumps(fallidos, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
 
         # ── Paso 3: Armar Excel ───────────────────────────────────────────────
         write_status(job_id, "running", "Armando Excel de conciliación...", 0.80)
@@ -101,6 +116,7 @@ def run_pipeline(job_id: str) -> None:
         resumen["n_listado"] = stats["n_listado"]
         resumen["n_xml"]     = stats["n_xml"]
         resumen["fallidos"]  = len(fallidos)
+        resumen["fallidos_detalle"] = fallidos  # lista de {clave, motivo}
 
         # ── Completado ────────────────────────────────────────────────────────
         write_status(job_id, "done", "Completado", 1.0, resumen=resumen)
