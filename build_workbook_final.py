@@ -38,6 +38,14 @@ def build_workbook(txt_path: str, xml_glob: str, output_path: str) -> dict:
     df_listado = parse_recibidos_txt(txt_path)          # 578 filas: TODO el mes, sin montos
     df_cab, df_det = parse_folder(xml_glob)              # solo los XML ya descargados
 
+    # El caché de XML es compartido entre períodos: quedarse solo con los
+    # comprobantes del TXT cargado, o se mezclan retenciones de otros meses.
+    claves_txt = set(df_listado["CLAVE_ACCESO"].dropna())
+    if len(df_cab):
+        df_cab = df_cab[df_cab["Clave_Acceso"].isin(claves_txt)].reset_index(drop=True)
+    if len(df_det):
+        df_det = df_det[df_det["Clave_Acceso"].isin(claves_txt)].reset_index(drop=True)
+
     claves_con_xml = set(df_cab["Clave_Acceso"]) if len(df_cab) else set()
     df_listado["XML_Descargado"] = df_listado["CLAVE_ACCESO"].isin(claves_con_xml)
 
