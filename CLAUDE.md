@@ -166,3 +166,28 @@ pip install pandas openpyxl requests
   usuario; nunca sobreescribir fórmulas existentes en `Conciliacion`.
 - Colores de las hojas de conciliación: azul = resumen, naranja = Solo SRI,
   rojo = Solo Odoo, amarillo = diferencias de valor, violeta = factura incorrecta.
+
+## Aplicación web (FastAPI)
+
+El pipeline también corre como app web desplegada en Easypanel (Docker):
+
+| Archivo | Rol |
+|---|---|
+| `app.py` | FastAPI: `GET /`, `POST /upload` (TXT del SRI + `reten_odoo.xlsx`), `GET /status/{job_id}`, `GET /download/{job_id}`. Auth por cookie de sesión firmada (`SECRET_KEY`, `SESSION_HOURS`). |
+| `pipeline.py` | `run_pipeline(job_id)`: lee TXT → descarga XML (con caché) → `build_workbook` → `conciliar`. Corre en un hilo background. |
+| `job_manager.py` | Crea/lee jobs en `jobs/<job_id>/` (`status.json`, `Recibidos.txt`, `reten_odoo.xlsx`, `resultado.xlsx`, `fallidos.json`). Limpieza automática a las 2 h. |
+| `auth.py`, `setup_usuario.py` | Usuarios en `data/users.yaml` (montado como volumen en Docker). |
+
+Tests: `python -m pytest tests -q`.
+
+### Caché de XML compartido (importante)
+
+`cache/xml/<clave>.xml` es **compartido entre todos los jobs y períodos**: evita
+re-descargar comprobantes ya bajados. Consecuencia: el glob `cache/xml/[0-9]*.xml`
+contiene XML de **todos** los meses procesados.
+
+- `build_workbook` filtra los XML por las claves de acceso del TXT cargado. Sin
+  ese filtro, `SRI_Detalle_Retenciones` (y por tanto la conciliación) mezclaba
+  retenciones de meses anteriores (bug corregido: septiembre mostraba agosto).
+- Nunca alimentes `parse_folder` / el Excel con el glob del caché sin filtrar por
+  las claves del TXT del período.
