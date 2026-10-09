@@ -1,12 +1,22 @@
+# Secretos y credenciales
 users.yaml
+.env
+
+# Estado de ejecución / caché
 jobs/
 cache/
 __pycache__/
 *.pyc
-.env
+.pytest_cache/
+
+# Datos del negocio (comprobantes, reportes de Odoo, claves) — nunca versionar
 *.xlsx
-*.txt
 *.xml
-nginx.conf
-claves_pendientes.txt
+*.txt
+!requirements.txt
+venta/
 xml_samples/
+claves_pendientes.txt
+
+# Config local de nginx en la raíz (la de despliegue va en deploy/)
+/nginx.conf
