@@ -96,3 +96,19 @@ def test_sri_con_columnas_incorrectas(datos, tmp_path):
     (carpeta / "emitidos_2026-03-01.txt").write_text("X\tY\n1\t2\n", encoding="iso-8859-1")
     with pytest.raises(ValueError, match="SRI"):
         conciliar_ventas(str(odoo), str(carpeta), str(salida))
+
+
+def test_texto_con_formula_no_se_ejecuta(datos):
+    """Un nombre de cliente que empieza con '=' debe quedar como texto, no fórmula."""
+    import openpyxl
+    odoo, emitidos, salida = datos
+    wb = openpyxl.load_workbook(odoo)
+    celda = wb.active["C2"]  # Nombre del socio, primera fila de datos
+    celda.value = '=HYPERLINK("http://x","click")'
+    celda.data_type = "s"  # texto, como lo entregaría un export real de Odoo
+    wb.save(odoo)
+    conciliar_ventas(str(odoo), str(emitidos), str(salida))
+    ws = openpyxl.load_workbook(salida)["Detalle"]
+    celdas = [c for row in ws.iter_rows() for c in row
+              if isinstance(c.value, str) and "HYPERLINK" in c.value]
+    assert celdas and all(c.data_type == "s" for c in celdas)

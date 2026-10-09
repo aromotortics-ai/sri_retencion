@@ -129,6 +129,10 @@ def _hoja(wb, nombre, df, color, anchos=None):
     for row in ws.iter_rows(min_row=2):
         for c in row:
             c.font = Font(name=FONT)
+            # Datos de Odoo/SRI son no confiables: un texto que empieza con "="
+            # no debe guardarse como fórmula.
+            if isinstance(c.value, str) and c.value.startswith(("=", "+", "-", "@")):
+                c.data_type = "s"
             if hasattr(c.value, "year"):
                 c.number_format = "dd/mm/yyyy"
     for i, col in enumerate(df.columns, 1):
