@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Conciliación SRI · Retenciones</title>
+  <title>Conciliación SRI</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, sans-serif; background: #f4f6f9; display: flex;
            justify-content: center; align-items: center; min-height: 100vh; padding: 1rem; }
     .card { background: white; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,.1);
-            padding: 2rem; width: 100%; max-width: 480px; }
+            padding: 2rem; width: 100%; max-width: 520px; }
     h1 { color: #1F4E78; font-size: 1.3rem; margin-bottom: 0.25rem; }
     .subtitle { color: #666; font-size: 0.85rem; margin-bottom: 1.5rem; }
     .field { margin-bottom: 1rem; }
@@ -44,25 +44,48 @@
                  max-height: 120px; overflow-y: auto; margin-bottom: 1rem; }
     .btn-retry { background: #888; }
     .btn-retry:hover { background: #666; }
+    .tabs { display: flex; gap: .25rem; border-bottom: 2px solid #e0e7ef; margin-bottom: 1.25rem; }
+    .tab { width: auto; margin: 0; padding: .5rem 1rem; background: none; color: #666;
+           border-radius: 4px 4px 0 0; font-size: .9rem; }
+    .tab:hover { background: #eef2f7; }
+    .tab.active { color: #1F4E78; font-weight: bold; border-bottom: 3px solid #1F4E78; margin-bottom: -2px; }
+    .file-count { font-size: .78rem; color: #666; margin-top: .3rem; }
   </style>
 </head>
 <body>
 <div class="card">
   <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.25rem;">
-    <h1>Conciliación SRI · Retenciones</h1>
+    <h1>Conciliación SRI</h1>
     <a href="/logout" style="font-size:0.78rem;color:#888;text-decoration:none;" title="Cerrar sesión">Salir</a>
   </div>
-  <p class="subtitle">Sube los dos archivos y descarga el Excel de conciliación.</p>
+  <p class="subtitle" id="subtitle">Sube los archivos y descarga el Excel de conciliación.</p>
+  <div class="tabs">
+    <button class="tab active" id="tab-retenciones" onclick="setMode('retenciones')">Retenciones</button>
+    <button class="tab" id="tab-ventas" onclick="setMode('ventas')">Ventas</button>
+  </div>
 
   <!-- Formulario -->
   <div id="form-section">
-    <div class="field">
-      <label>1. Archivo TXT del portal SRI</label>
-      <input type="file" id="txt-file" accept=".txt">
+    <div id="form-retenciones">
+      <div class="field">
+        <label>1. Archivo TXT del portal SRI</label>
+        <input type="file" id="txt-file" accept=".txt">
+      </div>
+      <div class="field">
+        <label>2. Reporte de retenciones de Odoo (.xlsx)</label>
+        <input type="file" id="xlsx-file" accept=".xlsx">
+      </div>
     </div>
-    <div class="field">
-      <label>2. Reporte de retenciones de Odoo (.xlsx)</label>
-      <input type="file" id="xlsx-file" accept=".xlsx">
+    <div id="form-ventas" style="display:none;">
+      <div class="field">
+        <label>1. TXT diarios de comprobantes emitidos (SRI)</label>
+        <input type="file" id="emitidos-files" accept=".txt" multiple>
+        <p class="file-count" id="emitidos-count">Selecciona todos los <code>emitidos_AAAA-MM-DD.txt</code> del período.</p>
+      </div>
+      <div class="field">
+        <label>2. Facturas de cliente de Odoo (.xlsx)</label>
+        <input type="file" id="odoo-venta-file" accept=".xlsx">
+      </div>
     </div>
     <button id="btn-procesar" onclick="startJob()">Procesar</button>
   </div>
@@ -94,6 +117,24 @@
   let pollInterval = null;
   let startTime   = null;
   let currentJobId = null;
+  let mode = "retenciones";
+
+  function setMode(m) {
+    mode = m;
+    ["retenciones","ventas"].forEach(k => {
+      document.getElementById("tab-" + k).classList.toggle("active", k === m);
+      document.getElementById("form-" + k).style.display = k === m ? "block" : "none";
+    });
+    reset();
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("emitidos-files").addEventListener("change", e => {
+      const n = e.target.files.length;
+      document.getElementById("emitidos-count").textContent =
+        n ? `${n} archivo${n === 1 ? "" : "s"} seleccionado${n === 1 ? "" : "s"}` : "";
+    });
+  });
 
   function show(id) {
     ["form-section","progress-section","result-section","error-section"]
@@ -101,17 +142,27 @@
   }
 
   async function startJob() {
-    const txt  = document.getElementById("txt-file").files[0];
-    const xlsx = document.getElementById("xlsx-file").files[0];
-    if (!txt || !xlsx) { alert("Selecciona ambos archivos."); return; }
-
-    document.getElementById("btn-procesar").disabled = true;
     const fd = new FormData();
-    fd.append("recibidos", txt);
-    fd.append("reten_odoo", xlsx);
+    let url;
+    if (mode === "ventas") {
+      const txts = document.getElementById("emitidos-files").files;
+      const xlsx = document.getElementById("odoo-venta-file").files[0];
+      if (!txts.length || !xlsx) { alert("Selecciona los TXT del SRI y el Excel de Odoo."); return; }
+      for (const f of txts) fd.append("emitidos", f);
+      fd.append("odoo_venta", xlsx);
+      url = "/upload-ventas";
+    } else {
+      const txt  = document.getElementById("txt-file").files[0];
+      const xlsx = document.getElementById("xlsx-file").files[0];
+      if (!txt || !xlsx) { alert("Selecciona ambos archivos."); return; }
+      fd.append("recibidos", txt);
+      fd.append("reten_odoo", xlsx);
+      url = "/upload";
+    }
+    document.getElementById("btn-procesar").disabled = true;
 
     try {
-      const r = await fetch("/upload", { method: "POST", body: fd });
+      const r = await fetch(url, { method: "POST", body: fd });
       if (r.status === 401) { location = "/login"; return; }
       if (!r.ok) { throw new Error(`HTTP ${r.status}`); }
       const { job_id } = await r.json();
@@ -154,7 +205,16 @@
   function showResult(job_id, resumen) {
     show("result-section");
     const grid = document.getElementById("stat-grid");
-    const rows = [
+    const rows = mode === "ventas" ? [
+      ["Facturas en SRI",              resumen.n_sri,               ""],
+      ["Facturas en Odoo",             resumen.n_odoo,              ""],
+      ["Coinciden",                    resumen.coinciden,           "ok"],
+      ["Diferencias (valor/clave/fecha)", resumen.diferencias,      resumen.diferencias > 0 ? "warn" : "ok"],
+      ["Solo en SRI · falta en Odoo",  resumen.solo_sri,            resumen.solo_sri > 0 ? "warn" : "ok"],
+      ["Solo en Odoo · revisar",       resumen.solo_odoo,           resumen.solo_odoo > 0 ? "warn" : "ok"],
+      ["Odoo no autorizado",           resumen.odoo_no_autorizado,  resumen.odoo_no_autorizado > 0 ? "warn" : "ok"],
+      ["Duplicados en TXT del SRI",    resumen.duplicados_sri,      resumen.duplicados_sri > 0 ? "warn" : "ok"],
+    ] : [
       ["Retenciones SRI",           resumen.n_listado,       ""],
       ["XMLs descargados",          resumen.n_xml,           resumen.n_xml === resumen.n_listado ? "ok" : "warn"],
       ["Líneas coinciden",          resumen.coinciden,       "ok"],
@@ -182,6 +242,10 @@
     currentJobId = null;
     document.getElementById("txt-file").value = "";
     document.getElementById("xlsx-file").value = "";
+    document.getElementById("emitidos-files").value = "";
+    document.getElementById("odoo-venta-file").value = "";
+    document.getElementById("emitidos-count").textContent =
+      "Selecciona todos los emitidos_AAAA-MM-DD.txt del período.";
     document.getElementById("btn-procesar").disabled = false;
     document.getElementById("bar-fill").style.width = "0%";
     show("form-section");

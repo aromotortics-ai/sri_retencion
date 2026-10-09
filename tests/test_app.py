@@ -117,3 +117,44 @@ def test_upload_creates_job(client, tmp_path, monkeypatch):
     r2 = client.get(f"/status/{job_id}", cookies=cookies)
     assert r2.status_code == 200
     assert r2.json()["estado"] in ("pending", "running", "done")
+
+
+def test_upload_ventas_returns_401_without_session(client):
+    assert client.post("/upload-ventas").status_code == 401
+
+
+def test_upload_ventas_missing_files(client):
+    cookies = _login(client)
+    assert client.post("/upload-ventas", cookies=cookies).status_code == 422
+
+
+def test_upload_ventas_creates_job_with_multiple_txt(client, monkeypatch):
+    import app as app_module
+    from job_manager import get_job_dir
+    monkeypatch.setattr(app_module, "run_pipeline_ventas", lambda job_id: None)
+
+    cookies = _login(client)
+    r = client.post(
+        "/upload-ventas",
+        cookies=cookies,
+        files=[
+            ("odoo_venta", ("odoo.xlsx", b"x", "application/octet-stream")),
+            ("emitidos", ("emitidos_2026-03-01.txt", b"a", "text/plain")),
+            ("emitidos", ("emitidos_2026-03-02.txt", b"b", "text/plain")),
+        ],
+    )
+    assert r.status_code == 200
+    job_id = r.json()["job_id"]
+    d = get_job_dir(job_id)
+    assert (d / "odoo_venta.xlsx").exists()
+    assert sorted(p.name for p in (d / "emitidos").iterdir()) == [
+        "emitidos_2026-03-01.txt", "emitidos_2026-03-02.txt"]
+
+
+def test_download_ventas_name(client):
+    from job_manager import create_job, get_job_dir
+    cookies = _login(client)
+    job_id = create_job()
+    (get_job_dir(job_id) / "resultado.xlsx").write_bytes(b"x")
+    r = client.get(f"/download/{job_id}", cookies=cookies)
+    assert r.status_code == 200

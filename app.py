@@ -16,6 +16,7 @@ from itsdangerous import TimestampSigner, BadSignature, SignatureExpired
 from auth import verify_user
 from job_manager import create_job, read_status, get_job_dir, mark_stale_jobs_as_error
 from pipeline import run_pipeline
+from pipeline_ventas import run_pipeline_ventas
 
 BASE_DIR       = Path(__file__).parent
 USERS_FILE     = str(BASE_DIR / "data" / "users.yaml")
@@ -124,6 +125,31 @@ async def upload(
     t = threading.Thread(target=run_pipeline, args=(job_id,), daemon=True)
     t.start()
 
+    return {"job_id": job_id}
+
+
+@app.post("/upload-ventas")
+async def upload_ventas(
+    odoo_venta: UploadFile = File(...),
+    emitidos: list[UploadFile] = File(...),
+    _user: str = Depends(require_session),
+):
+    job_id  = create_job()
+    job_dir = get_job_dir(job_id)
+    (job_dir / "emitidos").mkdir()
+
+    (job_dir / "odoo_venta.xlsx").write_bytes(await odoo_venta.read())
+    for i, f in enumerate(emitidos):
+        # basename para evitar path traversal; prefijo si hay nombres repetidos
+        nombre = Path(f.filename or f"emitidos_{i}.txt").name
+        if not nombre.startswith("emitidos_"):
+            nombre = f"emitidos_{nombre}"  # el lector solo toma emitidos_*.txt
+        dest = job_dir / "emitidos" / nombre
+        if dest.exists():
+            dest = job_dir / "emitidos" / f"{i}_{nombre}"
+        dest.write_bytes(await f.read())
+
+    threading.Thread(target=run_pipeline_ventas, args=(job_id,), daemon=True).start()
     return {"job_id": job_id}
 
 
