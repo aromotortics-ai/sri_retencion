@@ -279,3 +279,36 @@ def test_recalculo_libreoffice_si_existe(tmp_path, monkeypatch):
     assert llamadas and "--convert-to" in llamadas[0]
     assert not any("LibreOffice" in a for a in res["advertencias"])
     assert (tmp_path / "o.xlsx").read_bytes() == b"recalculado"
+
+
+def test_sin_ret_advierte_falta_txt_de_retenciones(tmp_path, monkeypatch):
+    import shutil
+    import conciliar_compras as cc
+    monkeypatch.setattr(shutil, "which", lambda *_: None)
+    p = _txt(tmp_path / "a.txt", [_fila("1" * 49)])
+    res = cc.conciliar_compras([p], _odoo_vacio(), date(2026, 9, 1), date(2026, 9, 30),
+                               str(tmp_path / "o.xlsx"))
+    assert "Falta el TXT de retenciones" in res["advertencias"]
+    assert "retenciones" not in res["por_tipo"]
+
+
+def test_con_ret_y_sin_compras_emite_hojas_y_contadores(tmp_path, monkeypatch):
+    import shutil
+    import openpyxl
+    import conciliar_compras as cc
+    import conciliar_retenciones as cr
+    monkeypatch.setattr(shutil, "which", lambda *_: None)
+    p = _txt(tmp_path / "r.txt", [_fila("1" * 49, tipo="Comprobante de Retención")])
+    ret = pd.DataFrame([{"estado": cr.EST_SOLO_SRI, "n_ret": "001-200-000000001",
+                         "fecha": pd.Timestamp("2026-09-05"), "ruc": "1790000000001",
+                         "proveedor": "PROVEEDOR SA", "factura_sri": "001-001-000000010",
+                         "pct_sri": 1.0, "base_sri": 100.0, "valor_sri": 1.0,
+                         "clave": "1" * 49}], columns=cr.COLUMNAS)
+    res = cc.conciliar_compras([p], _odoo_vacio(), date(2026, 9, 1), date(2026, 9, 30),
+                               str(tmp_path / "o.xlsx"), ret=ret)
+    assert res["por_tipo"]["retenciones"]["solo_sri"] == 1
+    assert res["por_tipo"]["FAC"] == {"coinciden": 0, "solo_sri": 0, "solo_odoo": 0,
+                                      "diferencias": 0, "informativos": 0}
+    assert "Falta el TXT de retenciones" not in res["advertencias"]
+    assert "Falta el TXT de facturas" in res["advertencias"]
+    assert "Ret_Solo_SRI" in openpyxl.load_workbook(tmp_path / "o.xlsx").sheetnames
