@@ -179,3 +179,122 @@ def test_factory_por_defecto_usa_transport_con_timeout_60():
         tr = proxy._ServerProxy__transport
         assert isinstance(tr, cls)
         assert tr.make_connection("odoo").timeout == odoo_client.TIMEOUT_SEGUNDOS == 60
+
+
+# ---------------------------------------------------------------- retenciones recibidas
+
+class FakeProxyRet:
+    def __init__(self, rets, lineas, facturas=None, partners=None, falla_en=None):
+        self.rets, self.lineas = rets, lineas
+        self.facturas = facturas or []
+        self.partners = partners or [{"id": 7, "vat": "1790000000001"}]
+        self.falla_en = falla_en
+        self.llamadas = []
+
+    def authenticate(self, db, user, pwd, ctx):
+        return 9
+
+    def execute_kw(self, db, uid, pwd, model, method, args, kw=None):
+        self.llamadas.append((model, method, args, kw))
+        assert method in {"search_read", "read", "search_count", "fields_get"}
+        if self.falla_en == model:
+            raise OSError("fallo http://u:secreto123@host")
+        kw = kw or {}
+        data = {"account.move.retention": self.rets,
+                "account.move.retention.line": self.lineas,
+                "account.move": self.facturas}.get(model)
+        if data is not None and method == "search_read":
+            dom = args[0]
+            for cond in dom:
+                if cond[0] in ("id", "retention_id") and cond[1] == "in":
+                    campo = "id" if cond[0] == "id" else "retention_id"
+                    ids = set(cond[2])
+                    data = [d for d in data if (d[campo][0] if isinstance(d[campo], list) else d[campo]) in ids]
+            off = kw.get("offset", 0)
+            return data[off:off + kw.get("limit", 500)]
+        if model == "res.partner":
+            return self.partners
+        return []
+
+
+def ret(**kw):
+    base = {"id": 10, "retention_number": "001-200-000004340", "retention_date": "2026-09-12",
+            "state": "posted", "partner_id": [7, "Cliente SA"], "invoice_id": [100, "FAC"],
+            "type": "out_retention"}
+    base.update(kw)
+    return base
+
+
+def lin(i, rid, pct=2.0, base=100.0, val=2.0, tax="312 - Transferencia de bienes (2%)"):
+    return {"id": i, "retention_id": [rid, "x"], "amount_untaxed": base,
+            "amount_retention": val, "tax_percent": pct, "tax_id": [50 + i, tax]}
+
+
+def fac(i=100, name="FAC 006-001-000003385", x_number=False):
+    return {"id": i, "name": name, "x_number": x_number}
+
+
+def proxy_ret(**kw):
+    rets = kw.pop("rets", [ret(), ret(id=11, retention_number="001-200-000004341",
+                                      state="cancel", invoice_id=[101, "x"])])
+    lineas = kw.pop("lineas", [lin(1, 10), lin(2, 10, pct=30.0, val=30.0, tax="725 - IVA 30% (30%)"),
+                               lin(3, 11)])
+    facturas = kw.pop("facturas", [fac(100, "006-001-000003385", False),
+                                   fac(101, "FAC", "001-002-000000009")])
+    return FakeProxyRet(rets, lineas, facturas, **kw)
+
+
+def fetch_ret(proxy):
+    return lector(proxy).fetch_retenciones(date(2026, 9, 1), date(2026, 9, 30))
+
+
+def test_fetch_retenciones_una_fila_por_linea():
+    df = fetch_ret(proxy_ret())
+    assert len(df) == 3
+    assert list(df.columns) == odoo_client.COLUMNAS_RET
+    assert df["ruc"].iloc[0] == "1790000000001"
+    assert df["fecha"].iloc[0] == pd.Timestamp("2026-09-12")
+
+
+def test_fetch_retenciones_solo_recibidas():
+    p = proxy_ret()
+    fetch_ret(p)
+    dom = next(a[0] for m, me, a, k in p.llamadas
+               if m == "account.move.retention" and me == "search_read")
+    assert ("type", "=", "out_retention") in dom
+    assert ("retention_date", ">=", "2026-08-27") in dom
+    assert ("retention_date", "<=", "2026-10-05") in dom
+    assert "in_retention" not in repr(dom)
+
+
+def test_fetch_retenciones_codigo_y_pct():
+    df = fetch_ret(proxy_ret())
+    assert df["cod"].iloc[0] == "312" and df["pct"].iloc[0] == 2.0
+    assert df["cod"].iloc[1] == "725" and df["pct"].iloc[1] == 30.0
+
+
+@pytest.mark.parametrize("name,xn", [("006-001-000003385", False),
+                                     ("FAC 006-001-000003385", False),
+                                     ("FAC", "006-001-000003385")])
+def test_fetch_retenciones_factura_formato_sri(name, xn):
+    p = proxy_ret(rets=[ret()], lineas=[lin(1, 10)], facturas=[fac(100, name, xn)])
+    assert fetch_ret(p)["factura"].iloc[0] == "006-001-000003385"
+
+
+def test_fetch_retenciones_estado_cancelada_se_conserva():
+    df = fetch_ret(proxy_ret())
+    assert df.loc[df["id_ret"] == 11, "estado"].tolist() == ["cancel"]
+    assert df.loc[df["id_ret"] == 10, "estado"].tolist() == ["posted", "posted"]
+    assert df.loc[df["id_ret"] == 11, "factura"].iloc[0] == "001-002-000000009"
+
+
+def test_fetch_retenciones_error_generico():
+    with pytest.raises(OdooError) as e:
+        fetch_ret(proxy_ret(falla_en="account.move.retention.line"))
+    assert "secreto123" not in str(e.value) and "secreto123" not in repr(e.value)
+    assert e.value.__suppress_context__ is True
+
+
+def test_fetch_retenciones_vacio():
+    df = fetch_ret(FakeProxyRet([], []))
+    assert df.empty and list(df.columns) == odoo_client.COLUMNAS_RET

@@ -20,6 +20,18 @@ CAMPOS = ["name", "x_number", "partner_id", "invoice_date", "move_type", "state"
 TIPOS = {"01": "FAC", "04": "NC", "05": "ND"}
 COLUMNAS = ["id", "num", "nfac", "socio", "ruc", "fecha", "tipo", "cod_comp", "clave",
             "base", "iva", "total", "afectada", "elegible"]
+COLUMNAS_RET = ["id_ret", "n_ret", "fecha", "estado", "socio", "ruc", "factura", "pct",
+                "base", "valor", "cod"]
+_NUM_DOC = re.compile(r"\d{3}-\d{3}-\d{9}")
+
+
+def _num_doc(*valores):
+    """Primer patron NNN-NNN-NNNNNNNNN hallado en los textos dados, o pd.NA."""
+    for v in valores:
+        t = _txt(v)
+        if t is not pd.NA and (m := _NUM_DOC.search(t)):
+            return m.group(0)
+    return pd.NA
 
 
 class OdooError(Exception):
@@ -172,3 +184,64 @@ class OdooReader:
                 "elegible": cod in TIPOS and clave is not pd.NA and not propio,
             })
         return pd.DataFrame(filas, columns=COLUMNAS)
+
+    def fetch_retenciones(self, desde: date, hasta: date, margen_dias: int = 5) -> pd.DataFrame:
+        """Retenciones RECIBIDAS (out_retention), todos los estados; una fila por linea."""
+        try:
+            return self._fetch_retenciones(desde, hasta, margen_dias)
+        except OdooError:
+            raise
+        except Exception:
+            raise OdooError("No se pudo consultar Odoo (error de conexión o de la consulta)") from None
+
+    def _fetch_retenciones(self, desde, hasta, margen_dias):
+        self._conectar()
+        dominio = [("type", "=", "out_retention"),
+                   ("retention_date", ">=", (desde - timedelta(days=margen_dias)).isoformat()),
+                   ("retention_date", "<=", (hasta + timedelta(days=margen_dias)).isoformat())]
+        rets = self._search_read_todo(
+            "account.move.retention", dominio,
+            ["retention_number", "retention_date", "state", "partner_id", "invoice_id", "type"])
+        if not rets:
+            return pd.DataFrame(columns=COLUMNAS_RET)
+
+        ids = [r["id"] for r in rets]
+        lineas = []
+        for i in range(0, len(ids), PAGINA):
+            lineas += self._search_read_todo(
+                "account.move.retention.line", [("retention_id", "in", ids[i:i + PAGINA])],
+                ["retention_id", "amount_untaxed", "amount_retention", "tax_percent", "tax_id"])
+        pids = sorted({r["partner_id"][0] for r in rets if r["partner_id"]})
+        vat = ({p["id"]: p["vat"] for p in self._call("res.partner", "read", [pids], fields=["vat"])}
+               if pids else {})
+        fids = sorted({r["invoice_id"][0] for r in rets if r["invoice_id"]})
+        facturas = {}
+        for i in range(0, len(fids), PAGINA):
+            for f in self._call("account.move", "search_read", [[("id", "in", fids[i:i + PAGINA])]],
+                                fields=["name", "x_number"]):
+                facturas[f["id"]] = _num_doc(f.get("x_number"), f.get("name"))
+
+        por_id = {r["id"]: r for r in rets}
+        filas = []
+        for ln in lineas:
+            r = por_id.get(ln["retention_id"][0])
+            if r is None:
+                continue
+            pid = r["partner_id"][0] if r["partner_id"] else None
+            fid = r["invoice_id"][0] if r["invoice_id"] else None
+            nombre_tax = ln["tax_id"][1] if ln["tax_id"] else ""
+            cod = _txt(nombre_tax.split(" - ", 1)[0]) if " - " in nombre_tax else pd.NA
+            filas.append({
+                "id_ret": r["id"],
+                "n_ret": _txt(r["retention_number"]),
+                "fecha": pd.Timestamp(r["retention_date"]) if r["retention_date"] else pd.NaT,
+                "estado": r["state"],
+                "socio": r["partner_id"][1] if r["partner_id"] else "",
+                "ruc": _txt(vat.get(pid)),
+                "factura": facturas.get(fid, pd.NA),
+                "pct": float(ln["tax_percent"] or 0),
+                "base": float(ln["amount_untaxed"] or 0),
+                "valor": float(ln["amount_retention"] or 0),
+                "cod": cod,
+            })
+        return pd.DataFrame(filas, columns=COLUMNAS_RET)
