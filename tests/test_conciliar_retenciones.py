@@ -120,6 +120,40 @@ def test_xml_no_disponible_no_es_solo_odoo():
     assert out.iloc[0]["clave"] == "1" * 49
 
 
+def test_xml_no_disponible_mismo_n_ret_otro_cliente():
+    # A y B usan el mismo n_ret (secuencias propias). El XML de A se descargó, el de B falló.
+    ruc_a, ruc_b = "1790000000001", "0990000000001"
+    clave_a, clave_b = "1" * 49, "2" * 49
+    txt = pd.DataFrame([
+        {"clave": clave_a, "serie": "001-200-000004340", "ruc": ruc_a, "proveedor": "A",
+         "fecha": pd.Timestamp("2026-09-10")},
+        {"clave": clave_b, "serie": "001-200-000004340", "ruc": ruc_b, "proveedor": "B",
+         "fecha": pd.Timestamp("2026-09-10")},
+    ], columns=TXT_COLS)
+    sri = _sri({"clave": clave_a, "ruc": ruc_a})
+    odoo = _odoo({"id_ret": 10, "ruc": ruc_a},
+                 {"id_ret": 20, "ruc": ruc_b, "socio": "B", "factura": "005-001-000000777"})
+    out = _run(sri, odoo, txt)
+    por_id = {int(r["id_ret"]): r for _, r in out.iterrows()}
+    assert len(out) == 2
+    assert por_id[10]["estado"] == EST_OK
+    assert por_id[20]["estado"] == EST_XML
+    assert por_id[20]["clave"] == clave_b
+
+
+def test_xml_no_disponible_odoo_sin_ruc_usa_solo_n_ret():
+    out = _run(_vacio_sri(), _odoo({"ruc": pd.NA}), _txt_df("001-200-000004340"))
+    assert list(out["estado"]) == [EST_XML]
+    assert out.iloc[0]["clave"] == "1" * 49
+
+
+def test_odoo_sin_ruc_con_xml_descargado_es_solo_odoo():
+    # El único comprobante del TXT con ese n_ret sí tiene XML: no hay XML faltante.
+    out = _run(_sri({"factura": "009-009-000000009"}), _odoo({"ruc": pd.NA}),
+               _txt_df("001-200-000004340"))
+    assert sorted(out["estado"]) == sorted([EST_SOLO_SRI, EST_SOLO_ODOO])
+
+
 def test_odoo_cancelada_es_informativa():
     odoo = _odoo({"estado": "cancel", "n_ret": "001-200-000009999"},
                  {"estado": "draft", "id_ret": 11, "n_ret": "001-200-000004340"})

@@ -203,19 +203,31 @@ def conciliar_retenciones(sri_lineas, odoo_lineas, sri_txt, desde, hasta):
     # (5) Restos. SRI siempre genera fila; Odoo publicado solo si su fecha esta en el periodo.
     for i in sorted(sri_libre):
         filas.append(_fila(EST_SOLO_SRI, s=sri[i]))
-    n_ret_sri = {s["n_ret"] for s in sri if s["n_ret"] is not None}
-    clave_txt = {}
+    # XML faltante a nivel de comprobante, por (ruc emisor, n_ret): los numeros de retencion son
+    # secuencias de cada emisor y pueden repetirse entre clientes distintos.
+    con_lineas = set()
+    if not sri_lineas.empty:
+        con_lineas = {(_txt(r), _txt(n)) for r, n in zip(sri_lineas["ruc"], sri_lineas["n_ret"])}
+    sin_xml = {}  # (ruc, serie) -> clave, solo comprobantes del TXT sin ninguna linea SRI
     if sri_txt is not None and not sri_txt.empty:
-        for serie, clave in zip(sri_txt["serie"], sri_txt["clave"]):
-            serie = _txt(serie)
-            if serie is not None:
-                clave_txt.setdefault(serie, clave)
+        for ruc, serie, clave in zip(sri_txt["ruc"], sri_txt["serie"], sri_txt["clave"]):
+            k = (_txt(ruc), _txt(serie))
+            if k[1] is not None and k not in con_lineas:
+                sin_xml.setdefault(k, clave)
     for j in sorted(odoo_libre):
         o = odoo[j]
         if not _en_periodo(o["fecha"], desde, hasta):
             continue
-        if o["n_ret"] in clave_txt and o["n_ret"] not in n_ret_sri:
-            filas.append(_fila(EST_XML, o=o, clave=clave_txt[o["n_ret"]]))
+        ruc = _txt(o["ruc"])
+        if ruc is not None:
+            k = (ruc, o["n_ret"])
+            falta, clave = k in sin_xml, sin_xml.get(k)
+        else:
+            # Sin RUC en Odoo: basta que algun comprobante del TXT con ese n_ret no tenga XML.
+            cand = [c for (_, serie), c in sin_xml.items() if serie == o["n_ret"]]
+            falta, clave = bool(cand), (cand[0] if len(cand) == 1 else None)
+        if falta:
+            filas.append(_fila(EST_XML, o=o, clave=clave))
         else:
             filas.append(_fila(EST_SOLO_ODOO, o=o))
 
