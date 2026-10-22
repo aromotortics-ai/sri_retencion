@@ -215,7 +215,7 @@ def construir_excel(sri, odoo, pares, desde, hasta, salida):
     ult, tot = r - 1, r
     rs[f"A{tot}"] = "Total"
     for col in "CDEFGHIKLM":
-        rs[f"{col}{tot}"] = f"=SUM({col}5:{col}{max(ult, 5)})"
+        rs[f"{col}{tot}"] = f"=SUM({col}5:{col}{ult})" if ult >= 5 else 0
     rs[f"J{tot}"] = f"=IF(C{tot}=0,0,(D{tot}+E{tot})/C{tot})"
     for rr in range(5, tot + 1):
         rs[f"J{rr}"].number_format = "0.0%"
