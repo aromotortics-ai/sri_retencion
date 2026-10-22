@@ -20,3 +20,8 @@ claves_pendientes.txt
 
 # Config local de nginx en la raíz (la de despliegue va en deploy/)
 /nginx.conf
+
+# Carpetas de trabajo con TXT/JSON de comprobantes del SRI (datos del negocio)
+documentos_electronicos/
+retenciones_emitidas/
+fallidos.json
