@@ -12,7 +12,10 @@ from conciliar_recibidas import FONT, _enc, _fuente
 TOL = 0.02
 COLORES = {"Resumen": "1F4E79", "Conciliacion": "1F4E79", "Solo_en_SRI": "ED7D31",
            "Solo_en_Odoo": "C00000", "Diferencia_Valor": "FFC000", "Duplicados_Odoo": "7030A0",
-           "Informativos": "808080", "SRI_Listado": "808080", "Odoo_Lineas": "808080"}
+           "Informativos": "808080",
+           "Ret_Conciliacion": "1F4E79", "Ret_Solo_SRI": "ED7D31", "Ret_Solo_Odoo": "C00000",
+           "Ret_Diferencia_Valor": "FFC000", "Ret_Factura_Incorrecta": "7030A0", "Ret_Informativos": "808080",
+           "SRI_Listado": "808080", "Odoo_Lineas": "808080"}
 _PELIGROSOS = ("=", "+", "-", "@")
 FUERA = "Fecha fuera del período"
 
@@ -52,7 +55,7 @@ def _hoja(wb, titulo, enc, filas, anchos, fmt=None):
     return ws
 
 
-def construir_excel(sri, odoo, pares, desde, hasta, salida):
+def construir_excel(sri, odoo, pares, desde, hasta, salida, ret=None):
     wb = Workbook()
     wb.remove(wb.active)
     ns, no = len(sri), len(odoo)
@@ -221,6 +224,11 @@ def construir_excel(sri, odoo, pares, desde, hasta, salida):
         rs[f"J{rr}"].number_format = "0.0%"
         for col in "KLM":
             rs[f"{col}{rr}"].number_format = "#,##0.00"
+    contadores_ret, sig = None, tot + 2
+    if ret is not None:
+        from excel_retenciones import agregar_hojas_retenciones, fila_resumen_retenciones
+        contadores_ret = agregar_hojas_retenciones(wb, ret)
+        sig = fila_resumen_retenciones(rs, tot + 1, len(ret)) + 1
     _fuente(rs, 4)
     for col in "ABCDEFGHIJKLM":
         rs[f"{col}{tot}"].font = Font(name=FONT, bold=True)
@@ -234,7 +242,7 @@ def construir_excel(sri, odoo, pares, desde, hasta, salida):
         f"{FUERA} (columna Observacion de Conciliacion) marca documentos de Odoo emparejados con fecha fuera del período.",
     ]
     for k, tx in enumerate(notas):
-        c = rs[f"A{tot + 2 + k}"]
+        c = rs[f"A{sig + k}"]
         c.value = tx
         c.font = Font(name=FONT, bold=(k == 0), size=9 if k else 10)
     rs.freeze_panes = "C5"
@@ -259,4 +267,6 @@ def construir_excel(sri, odoo, pares, desde, hasta, salida):
             "diferencias": int(q["es_dif"].sum()),
             "informativos": int((q["cat"] == CAT_INFO).sum()),
         }
+    if contadores_ret is not None:
+        resumen["retenciones"] = contadores_ret
     return resumen
