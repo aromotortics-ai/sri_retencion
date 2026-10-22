@@ -223,10 +223,17 @@ XML (montos y `numDocSustento` solo existen ahí) y usan el caché compartido `c
 | Archivo | Rol |
 |---|---|
 | `xml_cache.py` | `descargar_xmls` (WS público, con caché; devuelve los fallidos) y `lineas_sri` (líneas de retención de los XML del caché, filtradas por las claves del TXT). |
-| `conciliar_retenciones.py` | `leer_sri_retenciones_txt` y `conciliar_retenciones`: cruce por `(N° retención, factura, porcentaje)` y estados. |
-| `excel_retenciones.py` | Hojas `Ret_Conciliacion`, `Ret_Solo_SRI`, `Ret_Solo_Odoo`, `Ret_Diferencia_Valor`, `Ret_Factura_Incorrecta`, `Ret_Informativos` y la fila "Retenciones" del Resumen (fórmulas `COUNTIFS`). |
+| `conciliar_retenciones.py` | `leer_sri_retenciones_txt`, `conciliar_retenciones` (cruce **por línea**: `(N° retención, factura, porcentaje)` y estados) y `resumir_por_documento` (agrupa las líneas en **documentos** con un estado de documento). |
+| `excel_retenciones.py` | Hojas `Ret_Documentos`, `Ret_Conciliacion`, `Ret_Solo_SRI`, `Ret_Solo_Odoo`, `Ret_Diferencia_Valor`, `Ret_Factura_Incorrecta`, `Ret_Informativos` y la fila "Retenciones" del Resumen (fórmulas `COUNTIFS` sobre `Ret_Documentos`). |
 | `odoo_client.py` | `fetch_retenciones`: `out_retention` recibidas por XML-RPC, solo lectura, todos los estados. |
 
+- **Un documento = una fila**: un comprobante de retención (N° de retención) suele tener varias líneas (Renta + IVA, hasta 4). El cruce sigue siendo por línea, pero el resultado se presenta por **documento**:
+  - `Ret_Documentos` (primera hoja `Ret_*`): una fila por documento con Estado, líneas y valores SRI/Odoo (fórmulas `COUNTIFS`/`SUMIFS` sobre `Ret_Conciliacion` por la columna `Documento`), Diferencia y Detalle (p. ej. "1 de 2 líneas con diferencia (valor: 1)").
+  - `Ret_Conciliacion` es el **detalle por línea**, con las líneas de cada documento contiguas y dos columnas al final: `Documento` (clave) y `Estado_Documento` (fórmula `INDEX`/`MATCH` sobre `Ret_Documentos`).
+  - Estado del documento: se ignoran las líneas Informativo si hay otras; todas Informativo → Informativo; todas XML no disponible → XML no disponible; alguna Factura incorrecta → Factura incorrecta; todas Coincide / Solo en SRI / Solo en Odoo → ese estado; cualquier otra mezcla (p. ej. Renta coincide e IVA falta en Odoo) → Diferencia de valor.
+  - Clave de documento: N° de retención; si el mismo N° aparece con dos RUC distintos son dos documentos (`N° | RUC`); líneas sin N° son documentos propios (`(sin N°) id X`).
+  - `Ret_Solo_SRI`, `Ret_Solo_Odoo`, `Ret_Factura_Incorrecta`, `Ret_Informativos`: una fila por documento. `Ret_Diferencia_Valor`: todas las líneas de los documentos con diferencia, con `Estado_Linea`.
+  - Los contadores (`resumen.por_tipo.retenciones` y la fila "Retenciones" del Resumen) cuentan **documentos**; `documentos` y `lineas` dan los totales; `total_sri`/`total_odoo` siguen sumando valores.
 - **Porcentaje distinto**: mismo N° de retención y misma factura pero distinto porcentaje se empareja uno a uno por valor más cercano y se reporta como *Diferencia de valor*, no como Solo SRI + Solo Odoo.
 - **XML no disponible**: comprobantes del TXT cuyo XML no se pudo descargar o leer (o está vacío) no se declaran "Solo en SRI"; se listan como "XML no disponible" (se detecta por `(RUC emisor, N° retención)`). El conteo va en `resumen.retenciones_fallidos` y en `advertencias`.
 - Odoo cancelada/borrador queda "Informativo"; Odoo publicado solo cuenta como "Solo en Odoo" si su fecha cae en el período.

@@ -262,15 +262,17 @@
 
   function showResultCompras(job_id, resumen) {
     const nombres = { FAC: "Facturas", NC: "Notas de crédito", ND: "Notas de débito",
-                      retenciones: "Retenciones" };
+                      retenciones: "Retenciones (documentos)" };
     const filas = [["coinciden","Coinciden",0],["diferencias","Diferencias de valor",1],
                    ["solo_sri","Solo en SRI · falta en Odoo",1],["solo_odoo","Solo en Odoo · revisar",1],
                    ["informativos","Informativos (no aplica)",0]];
-    // Las retenciones usan "diferencia" (singular) y añaden "factura_incorrecta".
+    // Las retenciones cuentan DOCUMENTOS (un comprobante con varias líneas = 1), usan "diferencia"
+    // (singular) y añaden "factura_incorrecta" y las líneas de detalle.
     const filasRet = [["coinciden","Coinciden",0],["diferencia","Diferencias de valor",1],
                       ["solo_sri","Solo en SRI · falta en Odoo",1],["solo_odoo","Solo en Odoo · revisar",1],
                       ["factura_incorrecta","Factura incorrecta en Odoo",1],
-                      ["informativos","Informativos (no aplica)",0]];
+                      ["informativos","Informativos (no aplica)",0],
+                      ["lineas","Líneas de detalle (Ret_Conciliacion)",0]];
     let html = "";
     for (const [tipo, c] of Object.entries(resumen.por_tipo || {})) {
       html += `<span class="stat-sub">${nombres[tipo] || esc(tipo)}</span>`;

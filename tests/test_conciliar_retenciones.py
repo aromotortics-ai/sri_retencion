@@ -349,3 +349,136 @@ def test_leer_sri_retenciones_txt_sin_rutas():
     df = leer_sri_retenciones_txt([])
     assert list(df.columns) == ["clave", "serie", "ruc", "proveedor", "fecha"]
     assert df.empty
+
+
+# ------------------------------------------------------------------ resumen por documento
+# Un comprobante de retencion (N° de retencion) tiene varias lineas (Renta + IVA): el resumen
+# por documento agrupa esas lineas en UNA fila con un estado de documento.
+
+from conciliar_retenciones import COLUMNAS, COLUMNAS_DOC, resumir_por_documento  # noqa: E402
+
+N1, N2, N3 = "001-200-000000001", "001-200-000000002", "001-200-000000003"
+
+
+def _lin(estado, n_ret=N1, pct=1.0, vs=10.0, vo=10.0, ruc="1790000000001", id_ret=5,
+         fac_s="001-001-000000010", fac_o="001-001-000000010", fecha="2026-09-05"):
+    fac_s = fac_s if vs is not None else None
+    fac_o = fac_o if vo is not None else None
+    return {"estado": estado, "n_ret": n_ret, "fecha": pd.Timestamp(fecha), "ruc": ruc,
+            "proveedor": "CLIENTE SA", "factura_sri": fac_s, "factura_odoo": fac_o,
+            "pct_sri": pct if vs is not None else None, "pct_odoo": pct if vo is not None else None,
+            "base_sri": 100.0 if vs is not None else None, "base_odoo": 100.0 if vo is not None else None,
+            "valor_sri": vs, "valor_odoo": vo,
+            "dif_valor": round(vs - vo, 2) if vs is not None and vo is not None else None,
+            "id_ret": id_ret if vo is not None else None, "clave": CLAVE if vs is not None else None}
+
+
+def _lineas(*filas):
+    df = pd.DataFrame(list(filas), columns=COLUMNAS)
+    df["id_ret"] = pd.to_numeric(df["id_ret"], errors="coerce").astype("Int64")
+    return df
+
+
+def test_doc_todas_coinciden_es_una_fila():
+    d = resumir_por_documento(_lineas(_lin(EST_OK, pct=1.0), _lin(EST_OK, pct=2.0), _lin(EST_OK, pct=30.0)))
+    assert list(d.columns) == COLUMNAS_DOC
+    assert len(d) == 1
+    r = d.iloc[0]
+    assert r["estado"] == EST_OK and r["n_ret"] == N1 and r["doc"] == N1
+    assert (r["n_lineas_sri"], r["n_lineas_odoo"]) == (3, 3)
+    assert r["valor_sri"] == pytest.approx(30.0) and r["valor_odoo"] == pytest.approx(30.0)
+
+
+def test_doc_iva_ok_renta_dif_es_diferencia_con_detalle():
+    d = resumir_por_documento(_lineas(_lin(EST_OK, pct=30.0), _lin(EST_DIF, pct=1.75, vs=12.0, vo=10.0)))
+    assert len(d) == 1
+    assert d.iloc[0]["estado"] == EST_DIF
+    assert "1 de 2" in d.iloc[0]["detalle"]
+
+
+def test_doc_ausente_en_odoo_es_un_solo_sri():
+    d = resumir_por_documento(_lineas(*[_lin(EST_SOLO_SRI, pct=p, vo=None) for p in (1.0, 2.0, 30.0)]))
+    assert len(d) == 1
+    assert d.iloc[0]["estado"] == EST_SOLO_SRI
+    assert d.iloc[0]["n_lineas_sri"] == 3 and d.iloc[0]["n_lineas_odoo"] == 0
+
+
+def test_doc_solo_en_odoo():
+    d = resumir_por_documento(_lineas(_lin(EST_SOLO_ODOO, pct=1.0, vs=None), _lin(EST_SOLO_ODOO, pct=30.0, vs=None)))
+    assert len(d) == 1 and d.iloc[0]["estado"] == EST_SOLO_ODOO
+    assert d.iloc[0]["n_lineas_odoo"] == 2
+
+
+def test_doc_renta_en_ambos_iva_solo_sri_es_diferencia():
+    d = resumir_por_documento(_lineas(_lin(EST_OK, pct=1.75), _lin(EST_SOLO_SRI, pct=30.0, vo=None)))
+    assert len(d) == 1 and d.iloc[0]["estado"] == EST_DIF
+    assert "solo en SRI" in d.iloc[0]["detalle"]
+
+
+def test_doc_factura_incorrecta_tiene_precedencia():
+    d = resumir_por_documento(_lineas(_lin(EST_FAC, pct=1.75, fac_o="002-001-000000010"),
+                                      _lin(EST_DIF, pct=30.0, vs=5.0, vo=4.0),
+                                      _lin(EST_SOLO_SRI, pct=2.0, vo=None)))
+    assert len(d) == 1 and d.iloc[0]["estado"] == EST_FAC
+
+
+def test_doc_cancelada_mas_publicada_decide_la_publicada():
+    # Integrado con conciliar_retenciones: borrador + publicada del mismo N°, con 2 lineas cada una.
+    sri = _sri({"pct": 1.75, "valor": 1.75, "cod": "312"}, {"pct": 30.0, "valor": 4.5, "cod": "1"})
+    odoo = _odoo({"pct": 1.75, "valor": 1.75, "cod": "312"}, {"pct": 30.0, "valor": 4.5, "cod": "1"},
+                 {"estado": "draft", "id_ret": 11, "pct": 1.75, "valor": 1.0},
+                 {"estado": "cancel", "id_ret": 12, "pct": 30.0, "valor": 9.0})
+    ret = _run(sri, odoo)
+    assert (ret["estado"] == EST_INFO).sum() == 2
+    d = resumir_por_documento(ret)
+    assert len(d) == 1
+    r = d.iloc[0]
+    assert r["estado"] == EST_OK
+    assert r["n_lineas_odoo"] == 2 and r["valor_odoo"] == pytest.approx(6.25)
+
+
+def test_doc_solo_informativo():
+    d = resumir_por_documento(_lineas(_lin(EST_INFO, vs=None), _lin(EST_INFO, pct=30.0, vs=None)))
+    assert len(d) == 1 and d.iloc[0]["estado"] == EST_INFO
+    assert d.iloc[0]["n_lineas_odoo"] == 2
+
+
+def test_doc_xml_no_disponible():
+    d = resumir_por_documento(_lineas(_lin(EST_XML, vs=None), _lin(EST_XML, pct=30.0, vs=None)))
+    assert len(d) == 1 and d.iloc[0]["estado"] == EST_XML
+
+
+def test_doc_dos_clientes_con_mismo_numero_son_dos_documentos():
+    d = resumir_por_documento(_lineas(_lin(EST_OK, ruc="1790000000001"),
+                                      _lin(EST_SOLO_SRI, ruc="0990000000001", vo=None),
+                                      _lin(EST_SOLO_SRI, ruc="0990000000001", pct=30.0, vo=None)))
+    assert len(d) == 2
+    assert sorted(d["estado"]) == sorted([EST_OK, EST_SOLO_SRI])
+    assert d["doc"].is_unique
+    assert set(d["n_ret"]) == {N1}
+
+
+def test_doc_ruc_vacio_se_une_si_hay_un_solo_ruc():
+    d = resumir_por_documento(_lineas(_lin(EST_OK), _lin(EST_SOLO_ODOO, ruc=None, pct=30.0, vs=None)))
+    assert len(d) == 1 and d.iloc[0]["estado"] == EST_DIF
+
+
+def test_doc_sin_numero_son_documentos_separados():
+    d = resumir_por_documento(_lineas(_lin(EST_SOLO_ODOO, n_ret=None, vs=None, id_ret=7),
+                                      _lin(EST_SOLO_ODOO, n_ret=None, vs=None, id_ret=8),
+                                      _lin(EST_SOLO_ODOO, n_ret=None, vs=None, id_ret=8, pct=30.0)))
+    assert len(d) == 2
+    assert d["doc"].is_unique and all(k.startswith("(sin N°)") for k in d["doc"])
+    assert sorted(d["n_lineas_odoo"]) == [1, 2]
+
+
+def test_doc_orden_determinista_por_fecha_y_numero():
+    d = resumir_por_documento(_lineas(_lin(EST_OK, n_ret=N3, fecha="2026-09-01"),
+                                      _lin(EST_OK, n_ret=N2, fecha="2026-09-09"),
+                                      _lin(EST_OK, n_ret=N1, fecha="2026-09-09")))
+    assert list(d["n_ret"]) == [N3, N1, N2]
+
+
+def test_doc_vacio():
+    d = resumir_por_documento(pd.DataFrame(columns=COLUMNAS))
+    assert d.empty and list(d.columns) == COLUMNAS_DOC

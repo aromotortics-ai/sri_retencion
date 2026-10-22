@@ -262,6 +262,40 @@ def test_pipeline_con_compras_y_retenciones(tmp_path, monkeypatch):
     assert not any("retenciones" in a for a in s["resumen"]["advertencias"])
 
 
+_IVA_30 = ("<retencion><codigo>2</codigo><codigoRetencion>1</codigoRetencion><baseImponible>15.00</baseImponible>"
+           "<porcentajeRetener>30</porcentajeRetener><valorRetenido>4.50</valorRetenido></retencion>")
+
+
+def _xml_renta_iva(cache, clave, secuencial="000004340"):
+    """XML v2 con DOS lineas (Renta 1.75% + IVA 30%) en un mismo comprobante."""
+    cache.mkdir(parents=True, exist_ok=True)
+    cuerpo = (_autorizacion(clave, "2.0.0").replace("</retencion></retenciones>", "</retencion>" + _IVA_30
+                                                     + "</retenciones>")
+              .replace("<secuencial>000004340</secuencial>", f"<secuencial>{secuencial}</secuencial>"))
+    (cache / f"{clave}.xml").write_text('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' + cuerpo,
+                                        encoding="utf-8")
+
+
+def test_pipeline_retencion_multilinea_cuenta_documentos(tmp_path, monkeypatch):
+    # R1: Renta + IVA en SRI y en Odoo (1 documento, 2 lineas). R2: Renta + IVA solo en SRI.
+    iva = {**_linea_odoo(), "pct": 30.0, "base": 15.0, "valor": 4.5, "cod": "1"}
+    pc, job_id, _, cache, _, _ = _entorno(
+        tmp_path, monkeypatch, {"ret.txt": [_ret_txt(CLAVE_R1), _ret_txt(CLAVE_R2, serie=N_RET2)]},
+        lector=_Odoo([_linea_odoo(), iva]))
+    _xml_renta_iva(cache, CLAVE_R1)
+    _xml_renta_iva(cache, CLAVE_R2, secuencial="000004341")
+    pc.run_pipeline_compras(job_id)
+    s = read_status(job_id)
+    assert s["estado"] == "done", s
+    r = s["resumen"]["por_tipo"]["retenciones"]
+    assert (r["coinciden"], r["solo_sri"], r["diferencia"], r["solo_odoo"]) == (1, 1, 0, 0)
+    assert (r["documentos"], r["lineas"]) == (2, 4)
+    wb = openpyxl.load_workbook(get_job_dir(job_id) / "resultado.xlsx")
+    assert wb["Ret_Documentos"].max_row - 1 == 2
+    assert wb["Ret_Conciliacion"].max_row - 1 == 4
+    assert wb["Ret_Solo_SRI"].max_row - 1 == 1
+
+
 def test_pipeline_solo_retenciones(tmp_path, monkeypatch):
     pc, job_id, lector, cache, _, _ = _entorno(
         tmp_path, monkeypatch, {"ret.txt": [_ret_txt(CLAVE_R1)]})
@@ -446,8 +480,9 @@ def test_pipeline_un_xml_no_disponible_por_clave_fallida(tmp_path, monkeypatch):
     filas = list(wb["Ret_Conciliacion"].iter_rows(min_row=2, values_only=True))
     xml = [f for f in filas if f[0] == "XML no disponible"]
     assert len(xml) == s["resumen"]["retenciones_fallidos"]
-    assert sorted(f[-1] for f in xml) == sorted([CLAVE_R2, clave_r3])
-    por_clave = {f[-1]: f for f in xml}
+    # Clave = columna P (indice 15); Documento y Estado_Documento van despues.
+    assert sorted(f[15] for f in xml) == sorted([CLAVE_R2, clave_r3])
+    por_clave = {f[15]: f for f in xml}
     assert por_clave[CLAVE_R2][14] == 11            # con gemelo: una sola fila, con datos de Odoo
     assert por_clave[clave_r3][1] == n_ret3         # sin gemelo: lado SRI del TXT
     assert por_clave[clave_r3][14] is None

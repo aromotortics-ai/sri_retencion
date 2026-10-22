@@ -273,3 +273,150 @@ def _a_dataframe(filas):
         _p=out["pct_sri"].fillna(out["pct_odoo"]).fillna(-1.0),
     ).sort_values(["_n", "_f", "_p"], kind="mergesort")
     return out.loc[orden.index].reset_index(drop=True)
+
+
+# ------------------------------------------------------------------ resumen por documento
+
+COLUMNAS_DOC = ["doc", "estado", "n_ret", "fecha", "ruc", "proveedor", "factura_sri", "factura_odoo",
+                "n_lineas_sri", "n_lineas_odoo", "valor_sri", "valor_odoo", "detalle", "clave", "id_ret"]
+
+SIN_NUMERO = "(sin N°)"
+_COMODINES = str.maketrans({"*": "_", "?": "_", "~": "_"})  # comodines de MATCH/COUNTIFS en Excel
+
+
+def documento_por_linea(ret):
+    """Clave de documento (texto estable) de cada linea de `ret`, alineada con su indice.
+
+    - Documento = N° de retencion.
+    - Si un mismo N° aparece con dos o mas RUC distintos (clientes que comparten numeracion), cada
+      RUC es un documento ("N° | RUC"); las lineas sin RUC de ese N° forman "N° | (sin RUC)". Con un
+      solo RUC, las lineas sin RUC se unen a ese documento.
+    - Lineas sin N°: un documento por registro de Odoo ("(sin N°) id X"), o por clave de acceso, o
+      por fila si no tienen ninguno de los dos; nunca se mezclan registros distintos.
+    Los comodines de Excel (* ? ~) se reemplazan por "_" para que la clave sirva en MATCH/SUMIFS.
+    """
+    if ret.empty:
+        return pd.Series([], index=ret.index, dtype=object)
+    n_rets = [_txt(x) for x in ret["n_ret"]]
+    rucs = [_txt(x) for x in ret["ruc"]]
+    rucs_por_n = {}
+    for n, r in zip(n_rets, rucs):
+        if n is not None and r is not None:
+            rucs_por_n.setdefault(n, set()).add(r)
+    claves = []
+    for pos, (n, r, id_ret, clave) in enumerate(zip(n_rets, rucs, ret["id_ret"], ret["clave"])):
+        if n is not None:
+            k = n if len(rucs_por_n.get(n, ())) <= 1 else f"{n} | {r or '(sin RUC)'}"
+        elif id_ret is not None and not pd.isna(id_ret):
+            k = f"{SIN_NUMERO} id {int(id_ret)}"
+        elif _txt(clave) is not None:
+            k = f"{SIN_NUMERO} clave {_txt(clave)}"
+        else:
+            k = f"{SIN_NUMERO} fila {pos + 1}"
+        claves.append(k.translate(_COMODINES))
+    return pd.Series(claves, index=ret.index, dtype=object)
+
+
+def _plural(n, singular, plural):
+    return f"{n} {singular if n == 1 else plural}"
+
+
+def _estado_documento(estados):
+    """Estado del documento a partir de los estados de sus lineas (ver resumir_por_documento)."""
+    utiles = [e for e in estados if e != EST_INFO] or list(estados)
+    unicos = set(utiles)
+    if unicos == {EST_INFO}:
+        return EST_INFO
+    if unicos == {EST_XML}:
+        return EST_XML
+    if EST_FAC in unicos:
+        return EST_FAC
+    for est in (EST_OK, EST_SOLO_SRI, EST_SOLO_ODOO):
+        if unicos == {est}:
+            return est
+    return EST_DIF
+
+
+_TXT_DETALLE = {EST_DIF: "valor", EST_SOLO_SRI: "solo en SRI", EST_SOLO_ODOO: "solo en Odoo",
+                EST_XML: "XML no disponible", EST_FAC: "factura incorrecta"}
+
+
+def _detalle(estado, utiles):
+    n = len(utiles)
+    lineas = _plural(n, "línea", "líneas")
+    if estado == EST_OK:
+        return f"{lineas}: coinciden"
+    if estado == EST_SOLO_SRI:
+        return f"{lineas} solo en SRI"
+    if estado == EST_SOLO_ODOO:
+        return f"{lineas} solo en Odoo"
+    if estado == EST_XML:
+        return f"XML no disponible ({lineas})"
+    if estado == EST_INFO:
+        return f"Odoo cancelada/borrador ({lineas})"
+    malas = [e for e in utiles if e != EST_OK]
+    partes = [f"{_TXT_DETALLE.get(e, e)}: {malas.count(e)}" for e in
+              (EST_FAC, EST_DIF, EST_SOLO_SRI, EST_SOLO_ODOO, EST_XML) if e in malas]
+    texto = f"{len(malas)} de {lineas} con diferencia ({', '.join(partes)})"
+    return f"Factura sustento distinta en Odoo; {texto}" if estado == EST_FAC else texto
+
+
+def _unicos(valores):
+    vistos = []
+    for v in map(_txt, valores):
+        if v is not None and v not in vistos:
+            vistos.append(v)
+    return vistos
+
+
+def resumir_por_documento(ret: pd.DataFrame) -> pd.DataFrame:
+    """Agrupa las lineas de `conciliar_retenciones` en documentos: UNA fila por comprobante de
+    retencion (ver `documento_por_linea` para la clave). Columnas: COLUMNAS_DOC.
+
+    Estado del documento (en este orden):
+      1. Las lineas "Informativo" (Odoo cancelada/borrador) se ignoran si hay otras lineas.
+      2. Todas Informativo -> Informativo. Todas "XML no disponible" -> XML no disponible.
+      3. Alguna "Factura incorrecta en Odoo" -> Factura incorrecta en Odoo.
+      4. Todas Coincide -> Coincide; todas Solo en SRI -> Solo en SRI; todas Solo en Odoo -> Solo en Odoo.
+      5. Cualquier otra cosa (alguna Diferencia de valor, o mezcla como una linea que coincide y otra
+         que esta en un solo lado) -> Diferencia de valor; `detalle` dice cuantas lineas difieren y por que.
+    n_lineas_* y valor_* cuentan/suman las lineas consideradas (sin las informativas, salvo que el
+    documento sea solo informativo). Orden: fecha, N° de retencion, clave de documento.
+    """
+    if ret is None or ret.empty:
+        return pd.DataFrame(columns=COLUMNAS_DOC)
+    ret = ret.reset_index(drop=True)
+    claves = documento_por_linea(ret)
+    filas = []
+    for doc, g in ret.groupby(claves, sort=False):
+        estados = list(g["estado"])
+        estado = _estado_documento(estados)
+        cons = g if estado == EST_INFO else g[g["estado"] != EST_INFO]
+        vs = pd.to_numeric(cons["valor_sri"], errors="coerce")
+        vo = pd.to_numeric(cons["valor_odoo"], errors="coerce")
+        fechas = pd.to_datetime(g["fecha"], errors="coerce").dropna()
+        ids = [int(x) for x in cons["id_ret"] if x is not None and not pd.isna(x)]
+        filas.append({
+            "doc": doc,
+            "estado": estado,
+            "n_ret": _primero(cons["n_ret"]),
+            "fecha": fechas.min() if len(fechas) else pd.NaT,
+            "ruc": _primero(cons["ruc"]),
+            "proveedor": _primero(cons["proveedor"]),
+            "factura_sri": ", ".join(_unicos(cons["factura_sri"])) or None,
+            "factura_odoo": ", ".join(_unicos(cons["factura_odoo"])) or None,
+            "n_lineas_sri": int(vs.notna().sum()),
+            "n_lineas_odoo": int(vo.notna().sum()),
+            "valor_sri": round(float(vs.sum()), 2),
+            "valor_odoo": round(float(vo.sum()), 2),
+            "detalle": _detalle(estado, [e for e in estados if e != EST_INFO] or estados),
+            "clave": ", ".join(_unicos(cons["clave"])) or None,
+            "id_ret": ", ".join(str(i) for i in dict.fromkeys(ids)) or None,
+        })
+    out = pd.DataFrame(filas, columns=COLUMNAS_DOC)
+    out["fecha"] = pd.to_datetime(out["fecha"], errors="coerce")
+    for col in ("n_ret", "ruc", "proveedor", "factura_sri", "factura_odoo", "clave", "id_ret"):
+        out[col] = out[col].astype(object).where(out[col].notna(), pd.NA)
+    orden = out.assign(_n=out["n_ret"].fillna("")).sort_values(
+        ["fecha", "_n", "doc"], kind="mergesort", na_position="last")
+    return out.loc[orden.index].reset_index(drop=True)

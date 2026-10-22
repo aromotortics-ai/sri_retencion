@@ -13,7 +13,8 @@ TOL = 0.02
 COLORES = {"Resumen": "1F4E79", "Conciliacion": "1F4E79", "Solo_en_SRI": "ED7D31",
            "Solo_en_Odoo": "C00000", "Diferencia_Valor": "FFC000", "Duplicados_Odoo": "7030A0",
            "Informativos": "808080",
-           "Ret_Conciliacion": "1F4E79", "Ret_Solo_SRI": "ED7D31", "Ret_Solo_Odoo": "C00000",
+           "Ret_Documentos": "1F4E79", "Ret_Conciliacion": "1F4E79", "Ret_Solo_SRI": "ED7D31",
+           "Ret_Solo_Odoo": "C00000",
            "Ret_Diferencia_Valor": "FFC000", "Ret_Factura_Incorrecta": "7030A0", "Ret_Informativos": "808080",
            "SRI_Listado": "808080", "Odoo_Lineas": "808080"}
 _PELIGROSOS = ("=", "+", "-", "@")
@@ -230,7 +231,8 @@ def construir_excel(sri, odoo, pares, desde, hasta, salida, ret=None, periodo_re
         from excel_retenciones import agregar_hojas_retenciones, fila_resumen_retenciones
         contadores_ret = agregar_hojas_retenciones(wb, ret)
         sig = fila_resumen_retenciones(rs, tot + 1, len(ret), periodo=periodo_ret,
-                                       periodo_compras=(desde, hasta)) + 1
+                                       periodo_compras=(desde, hasta),
+                                       doc_n=contadores_ret["documentos"]) + 1
     _fuente(rs, 4)
     for col in "ABCDEFGHIJKLM":
         rs[f"{col}{tot}"].font = Font(name=FONT, bold=True)
