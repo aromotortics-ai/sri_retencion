@@ -42,6 +42,7 @@ Exportar retenciones de Odoo  →      5. conciliar_odoo.py
 | `parse_comprobante_xml.py` | Parsea cada XML descargado: cabecera + una fila por cada línea de retención. Soporta **v1.0.0** (`<impuestos>/<impuesto>`) y **v2.0.0** (`<docsSustento>/<docSustento>/<retenciones>/<retencion>`). |
 | `build_workbook_final.py` | Genera `Comprobantes_Retencion_<periodo>_Final.xlsx` con 5 hojas: `SRI_Listado`, `SRI_Detalle_Retenciones` (incluye columna `N_Retencion` y `Num_Doc_Sustento` formateados con guiones), `SRI_Por_Doc_Sustento`, `ERP_Compras`, `Conciliacion`. |
 | `conciliar_odoo.py` | Cruza `SRI_Detalle_Retenciones` contra `reten_odoo.xlsx` y añade 4 hojas al Excel: `Conciliacion_Odoo` (resumen), `Solo_en_SRI`, `Solo_en_Odoo`, `Diferencias_Valor`, `Factura_Incorrecta_Odoo`. |
+| `conciliar_emitidas.py` | Concilia retenciones **EMITIDAS** (la empresa retiene a proveedores): TXT diarios `retenciones_emitidas/emitidos_AAAA-MM-DD.txt` vs Excel de Odoo. Cruza por N° de retención a nivel de comprobante (el TXT no trae montos y el WS público solo guarda XML de ~30 días). Genera `Conciliacion_Retenciones_Emitidas_*.xlsx` con `Resumen_Mensual`, `Conciliacion`, `Solo_en_SRI`, `Solo_en_Odoo`, `Fecha_distinta`. Uso: `python conciliar_emitidas.py odoo.xlsx retenciones_emitidas salida.xlsx [desde] [hasta]` |
 | `reten_odoo.xlsx` | Reporte exportado desde Odoo (retenciones de compras del período). Se reemplaza cada vez que se corra el análisis. |
 | `xml_samples/` | Carpeta donde caen los XML descargados (nombrados `<clave_acceso>.xml`). El archivo `Comprobante_de_Reten.xml` es una muestra manual; el glob de parseo usa `[0-9]*.xml` para excluirlo. |
 | `claves_<periodo>.txt` | Lista de claves de acceso del período, generada por el paso 1. |
@@ -191,3 +192,23 @@ contiene XML de **todos** los meses procesados.
   retenciones de meses anteriores (bug corregido: septiembre mostraba agosto).
 - Nunca alimentes `parse_folder` / el Excel con el glob del caché sin filtrar por
   las claves del TXT del período.
+
+### Pestaña Compras (comprobantes recibidos SRI vs Odoo por API)
+
+Concilia facturas (01), notas de crédito (04) y notas de débito (05) **recibidas**: TXT del
+portal SRI contra Odoo 14 leído por XML-RPC en **solo lectura** (sin descargar XML).
+
+| Archivo | Rol |
+|---|---|
+| `odoo_client.py` | `OdooReader.from_env()`: `authenticate` + `search_read` de `account.move` (`in_invoice`/`in_refund`, `posted`, `invoice_date` del período ± 5 días). Calcula `elegible` por fila. Los errores nunca incluyen credenciales. |
+| `conciliar_compras.py` | `leer_sri_txts` (hasta 5 TXT: facturas, NC, ND), `tipos_faltantes`, `conciliar` (cruce por niveles: clave de acceso → N° documento + importe → N° documento → NC por factura afectada + importe) y `conciliar_compras` (orquesta y devuelve `{por_tipo, advertencias}`). |
+| `excel_compras.py` | `construir_excel`: libro con fórmulas (resumen por tipo + detalle). |
+| `pipeline_compras.py` | `run_pipeline_compras(job_id)`: TXT en `jobs/<id>/sri/*.txt` → periodo (`periodo_sri`) → Odoo → Excel. Hilo background. |
+
+- Ruta `POST /upload-compras` (campo `sri`, 1 a 5 TXT) y pestaña "Compras" en `templates/`; el estado y la descarga usan `/status/{job_id}` y `/download/{job_id}` como las demás.
+- Variables de entorno del servicio (Easypanel, nunca en la imagen): `ODOO_URL`, `ODOO_DB`, `ODOO_USER`, `ODOO_PASSWORD`. `os.environ` tiene prioridad; el `.env` local (ignorado por git) solo completa las que falten.
+- **Regla de elegibilidad** (una fila de Odoo se cruza solo si): tipo de comprobante `x_receipt_type_id` 01/04/05 **y** `x_authorization_number` numérico de 45–49 dígitos **y** `x_is_edocument` falso (no emitido por la propia empresa). Todo lo demás (tipo `OTRO`, sin clave, documentos propios) queda como "No aplica (informativo)".
+- Las NC se comparan por valor absoluto y se enlazan a la factura afectada (`reversed_entry_id`).
+- Compras **no usa** el caché compartido `cache/xml/` ni descarga XML: trabaja solo con el TXT.
+- **Fuera de alcance**: liquidaciones de compra, retenciones (siguen en sus pestañas) y vista diaria.
+- Período de reporte = **mes dominante** de las fechas de emisión del SRI (el que tiene más filas; empate: el más reciente). La lectura de Odoo usa la ventana min..max de fechas del SRI (más el margen de 5 días) para que un comprobante atípico (p. ej. una ND de julio dentro del TXT de septiembre) aún encuentre su par en Odoo; los asientos de Odoo sin par fuera del período de reporte no se listan.
