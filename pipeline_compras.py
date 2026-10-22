@@ -47,3 +47,4 @@ def run_pipeline_compras(job_id: str) -> None:
     except Exception as exc:
         write_status(job_id, "error", f"{type(exc).__name__}: {exc}",
                      error=traceback.format_exc())
+        schedule_cleanup(job_id, delay_seconds=7200)

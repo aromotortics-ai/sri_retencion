@@ -185,6 +185,46 @@ def test_solo_sri_genera_fila_sin_id_odoo():
     assert r.loc[0, "idx_sri"] == 0 and pd.isna(r.loc[0, "id_odoo"]) and r.loc[0, "tipo"] == "FAC"
 
 
+def test_clave_exacta_gana_aunque_otra_fila_de_odoo_se_procese_antes():
+    s = _sri({"clave": "1" * 49})
+    o = _odoo({"id": 1, "total": 99.0, "clave": "9" * 49},      # laxa, primera en el orden
+              {"id": 2, "clave": "1" * 49})                      # exacta, ultima
+    r = conciliar(s, o, D, H).set_index("id_odoo")
+    assert r.loc[2, "metodo"] == "Clave de acceso" and r.loc[2, "cat"] == ""
+    assert r.loc[1, "cat"] == CAT_DUP  # la fila laxa es la duplicada, no la exacta
+
+
+def test_nc_parciales_iguales_se_emparejan_con_sri_distintos():
+    s = _sri({"clave": "1" * 49, "tipo": "NC", "serie": "001-001-000000050", "afectada": "A-1", "total": 50.0},
+             {"clave": "2" * 49, "tipo": "NC", "serie": "001-001-000000051", "afectada": "A-1", "total": 50.0})
+    o = _odoo({"id": 1, "tipo": "NC", "nfac": "X1", "afectada": "A-1", "total": 50.0},
+              {"id": 2, "tipo": "NC", "nfac": "X2", "afectada": "A-1", "total": 50.0})
+    r = conciliar(s, o, D, H)
+    assert len(r) == 2
+    assert set(r["cat"]) == {""}
+    assert r["idx_sri"].notna().all() and r["id_odoo"].notna().all()
+    assert set(r["idx_sri"]) == {0, 1}
+
+
+def test_nfac_na_no_se_empareja():
+    r = conciliar(_sri({"clave": "1" * 49}), _odoo({"nfac": pd.NA}), D, H)
+    assert len(r) == 2
+    assert set(r["cat"]) == {"", CAT_SOLO_ODOO}
+
+
+def test_ambos_ruc_na_cruza_por_numero_y_total():
+    r = conciliar(_sri({"clave": "1" * 49, "ruc": pd.NA}), _odoo({"ruc": pd.NA}), D, H)
+    assert len(r) == 1 and r.loc[0, "metodo"] == "N° documento + importe"
+
+
+def test_nc_con_distinto_ruc_no_cruza_por_afectada():
+    s = _sri({"clave": "1" * 49, "tipo": "NC", "serie": "001-001-000000050", "afectada": "A-1", "total": 50.0})
+    o = _odoo({"tipo": "NC", "nfac": "OTRO", "ruc": "1790000000002", "afectada": "A-1", "total": 50.0})
+    r = conciliar(s, o, D, H)
+    assert len(r) == 2
+    assert set(r["cat"]) == {"", CAT_SOLO_ODOO}
+
+
 # ---- conciliar_compras (orquestación) ----
 from datetime import date
 

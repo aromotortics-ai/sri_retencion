@@ -155,4 +155,27 @@ def test_fallo_de_conexion_lanza_odooerror_sin_credenciales():
     with pytest.raises(OdooError) as e:
         lector(proxy).fetch_compras(date(2026, 9, 1), date(2026, 9, 30))
     assert "secreto123" not in str(e.value)
-    assert "secreto123" not in repr(e.value.__cause__ or "")
+    assert "secreto123" not in repr(e.value)
+    assert e.value.__suppress_context__ is True
+
+
+class _ProxyTimeout(FakeProxy):
+    def authenticate(self, *a):
+        raise TimeoutError("timed out contra http://u:secreto123@host")
+
+
+def test_timeout_lanza_odooerror_generico():
+    with pytest.raises(OdooError) as e:
+        lector(_ProxyTimeout([])).fetch_compras(date(2026, 9, 1), date(2026, 9, 30))
+    assert str(e.value) == "No se pudo consultar Odoo (error de conexión o de la consulta)"
+    assert "secreto123" not in repr(e.value) and e.value.__suppress_context__ is True
+
+
+def test_factory_por_defecto_usa_transport_con_timeout_60():
+    import xmlrpc.client
+    for url, cls in (("http://odoo/xmlrpc/2/common", xmlrpc.client.Transport),
+                     ("https://odoo/xmlrpc/2/common", xmlrpc.client.SafeTransport)):
+        proxy = odoo_client._proxy_con_timeout(url, allow_none=True)
+        tr = proxy._ServerProxy__transport
+        assert isinstance(tr, cls)
+        assert tr.make_connection("odoo").timeout == odoo_client.TIMEOUT_SEGUNDOS == 60

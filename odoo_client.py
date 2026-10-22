@@ -26,6 +26,29 @@ class OdooError(Exception):
     pass
 
 
+TIMEOUT_SEGUNDOS = 60
+
+
+class _TransportTimeout(xmlrpc.client.Transport):
+    def make_connection(self, host):
+        conn = super().make_connection(host)
+        conn.timeout = TIMEOUT_SEGUNDOS
+        return conn
+
+
+class _SafeTransportTimeout(xmlrpc.client.SafeTransport):
+    def make_connection(self, host):
+        conn = super().make_connection(host)
+        conn.timeout = TIMEOUT_SEGUNDOS
+        return conn
+
+
+def _proxy_con_timeout(url, **kw):
+    """ServerProxy con timeout por conexión (sin tocar el timeout global de sockets)."""
+    transporte = _SafeTransportTimeout() if url.lower().startswith("https") else _TransportTimeout()
+    return xmlrpc.client.ServerProxy(url, transport=transporte, **kw)
+
+
 def cargar_env(ruta_env: str | None = None) -> dict[str, str]:
     """os.environ, completado con las claves faltantes del archivo .env."""
     env = dict(os.environ)
@@ -55,7 +78,7 @@ def _clave(v):
 
 
 class OdooReader:
-    def __init__(self, url, db, user, password, proxy_factory=xmlrpc.client.ServerProxy):
+    def __init__(self, url, db, user, password, proxy_factory=_proxy_con_timeout):
         self._url = url.rstrip("/")
         self._db = db
         self._user = user

@@ -183,7 +183,7 @@ def test_upload_compras_nombre_con_ruta_no_escapa_del_job(client, monkeypatch):
     cookies = _login(client)
     r = client.post("/upload-compras", cookies=cookies,
                     files=[("sri", ("../../evil.txt", b"x", "text/plain")),
-                           ("sri", ("..\..\evil.txt", b"y", "text/plain"))])
+                           ("sri", (r"..\..\evil.txt", b"y", "text/plain"))])
     assert r.status_code == 200
     from job_manager import get_job_dir
     d = get_job_dir(r.json()["job_id"])

@@ -94,10 +94,13 @@ def conciliar(sri, odoo, desde, hasta):
 
     usados, filas = set(), []
 
-    def buscar(o):
+    def por_clave_exacta(o):
+        if pd.notna(o["clave"]) and (o["tipo"], o["clave"]) in por_clave:
+            return por_clave[(o["tipo"], o["clave"])], "Clave de acceso"
+        return None, ""
+
+    def buscar_flexible(o):
         t = o["tipo"]
-        if pd.notna(o["clave"]) and (t, o["clave"]) in por_clave:
-            return por_clave[(t, o["clave"])], "Clave de acceso"
         cand = [i for i in por_serie.get((t, o["nfac"]), []) if _ruc_compatible(sri.at[i, "ruc"], o["ruc"])]
         iguales = [i for i in cand if _mismo_total(sri.at[i, "total"], o["total"])]
         if iguales:
@@ -106,17 +109,34 @@ def conciliar(sri, odoo, desde, hasta):
         if len(cand) == 1:
             return cand[0], "N° documento (importe distinto)"
         if t == "NC" and pd.notna(o["afectada"]):
-            for i in por_afectada.get(o["afectada"], []):
-                if _ruc_compatible(sri.at[i, "ruc"], o["ruc"]) and _mismo_total(sri.at[i, "total"], o["total"]):
-                    return i, "NC: factura afectada + importe"
+            iguales = [i for i in por_afectada.get(o["afectada"], [])
+                       if _ruc_compatible(sri.at[i, "ruc"], o["ruc"])
+                       and _mismo_total(sri.at[i, "total"], o["total"])]
+            if iguales:
+                libres = [i for i in iguales if i not in usados]
+                return (libres or iguales)[0], "NC: factura afectada + importe"
         return None, ""
 
-    for _, o in odoo.iterrows():
-        idx, metodo = (None, "") if not o["elegible"] else buscar(o)
+    def registrar(o, idx, metodo):
+        cat = CAT_DUP if idx in usados else ""
+        usados.add(idx)
+        return (idx, o["id"], o["tipo"], metodo, cat)
+
+    # Pasada 1: clave de acceso para todas las filas elegibles (no depende del orden de Odoo).
+    resultado = {}
+    for pos, (_, o) in enumerate(odoo.iterrows()):
+        if o["elegible"]:
+            idx, metodo = por_clave_exacta(o)
+            if idx is not None:
+                resultado[pos] = registrar(o, idx, metodo)
+    # Pasada 2: demas niveles solo para las filas sin pareja.
+    for pos, (_, o) in enumerate(odoo.iterrows()):
+        if pos in resultado:
+            filas.append(resultado[pos])
+            continue
+        idx, metodo = (None, "") if not o["elegible"] else buscar_flexible(o)
         if idx is not None:
-            cat = CAT_DUP if idx in usados else ""
-            usados.add(idx)
-            filas.append((idx, o["id"], o["tipo"], metodo, cat))
+            filas.append(registrar(o, idx, metodo))
             continue
         if not (desde <= pd.Timestamp(o["fecha"]).date() <= hasta):
             continue

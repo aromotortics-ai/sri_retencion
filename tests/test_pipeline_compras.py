@@ -106,3 +106,21 @@ def test_pipeline_ventana_amplia_para_odoo_y_mes_dominante_para_conciliar(tmp_pa
     assert read_status(job_id)["estado"] == "done"
     assert _Lector.llamado == (date(2026, 7, 20), date(2026, 9, 30))
     assert (visto["d"], visto["h"]) == (date(2026, 9, 1), date(2026, 9, 30))
+
+
+def test_periodo_diciembre_con_atipico_de_enero(tmp_path, monkeypatch):
+    from datetime import date
+    pc, _ = _job(tmp_path, monkeypatch)
+    sri = _sri("2026-12-05", "2026-12-06", "2026-12-20", "2027-01-03")
+    assert pc.periodo_sri(sri) == (date(2026, 12, 1), date(2026, 12, 31),
+                                   date(2026, 12, 1), date(2027, 1, 3))
+
+
+def test_pipeline_con_error_agenda_limpieza(tmp_path, monkeypatch):
+    pc, job_id = _job(tmp_path, monkeypatch)
+    llamadas = []
+    monkeypatch.setattr(pc, "schedule_cleanup", lambda *a, **k: llamadas.append((a, k)))
+    monkeypatch.setattr(pc, "leer_sri_txts", lambda rutas: pd.DataFrame({"fecha": []}))
+    pc.run_pipeline_compras(job_id)
+    assert read_status(job_id)["estado"] == "error"
+    assert llamadas == [((job_id,), {"delay_seconds": 7200})]
