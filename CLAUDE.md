@@ -195,7 +195,7 @@ contiene XML de **todos** los meses procesados.
 
 ### Pestaña Compras (comprobantes recibidos SRI vs Odoo por API)
 
-Concilia facturas (01), notas de crédito (04) y notas de débito (05) **recibidas**: TXT del
+Concilia facturas (01), notas de crédito (04), notas de débito (05) y **retenciones recibidas**: TXT del
 portal SRI contra Odoo 14 leído por XML-RPC en **solo lectura** (sin descargar XML).
 
 | Archivo | Rol |
@@ -209,6 +209,27 @@ portal SRI contra Odoo 14 leído por XML-RPC en **solo lectura** (sin descargar 
 - Variables de entorno del servicio (Easypanel, nunca en la imagen): `ODOO_URL`, `ODOO_DB`, `ODOO_USER`, `ODOO_PASSWORD`. `os.environ` tiene prioridad; el `.env` local (ignorado por git) solo completa las que falten.
 - **Regla de elegibilidad** (una fila de Odoo se cruza solo si): tipo de comprobante `x_receipt_type_id` 01/04/05 **y** `x_authorization_number` numérico de 45–49 dígitos **y** `x_is_edocument` falso (no emitido por la propia empresa). Todo lo demás (tipo `OTRO`, sin clave, documentos propios) queda como "No aplica (informativo)".
 - Las NC se comparan por valor absoluto y se enlazan a la factura afectada (`reversed_entry_id`).
-- Compras **no usa** el caché compartido `cache/xml/` ni descarga XML: trabaja solo con el TXT.
-- **Fuera de alcance**: liquidaciones de compra, retenciones (siguen en sus pestañas) y vista diaria.
+- Facturas/NC/ND **no usan** el caché compartido `cache/xml/` ni descargan XML: trabajan solo con el TXT (solo las retenciones descargan XML, ver más abajo).
+- **Fuera de alcance**: liquidaciones de compra y vista diaria.
 - Período de reporte = **mes dominante** de las fechas de emisión del SRI (el que tiene más filas; empate: el más reciente). La lectura de Odoo usa la ventana min..max de fechas del SRI (más el margen de 5 días) para que un comprobante atípico (p. ej. una ND de julio dentro del TXT de septiembre) aún encuentre su par en Odoo; los asientos de Odoo sin par fuera del período de reporte no se listan.
+
+### Retenciones recibidas dentro de Compras
+
+Si entre los TXT (1 a 5) viene el de "Comprobante de Retención", el mismo job concilia también las
+retenciones (hojas `Ret_*` en el Excel de Compras). Cualquier subconjunto de TXT es válido; sin TXT de
+retenciones el resultado no cambia. A diferencia de facturas/NC/ND, las retenciones **sí** necesitan el
+XML (montos y `numDocSustento` solo existen ahí) y usan el caché compartido `cache/xml/`.
+
+| Archivo | Rol |
+|---|---|
+| `xml_cache.py` | `descargar_xmls` (WS público, con caché; devuelve los fallidos) y `lineas_sri` (líneas de retención de los XML del caché, filtradas por las claves del TXT). |
+| `conciliar_retenciones.py` | `leer_sri_retenciones_txt` y `conciliar_retenciones`: cruce por `(N° retención, factura, porcentaje)` y estados. |
+| `excel_retenciones.py` | Hojas `Ret_Conciliacion`, `Ret_Solo_SRI`, `Ret_Solo_Odoo`, `Ret_Diferencia_Valor`, `Ret_Factura_Incorrecta`, `Ret_Informativos` y la fila "Retenciones" del Resumen (fórmulas `COUNTIFS`). |
+| `odoo_client.py` | `fetch_retenciones`: `out_retention` recibidas por XML-RPC, solo lectura, todos los estados. |
+
+- **Porcentaje distinto**: mismo N° de retención y misma factura pero distinto porcentaje se empareja uno a uno por valor más cercano y se reporta como *Diferencia de valor*, no como Solo SRI + Solo Odoo.
+- **XML no disponible**: comprobantes del TXT cuyo XML no se pudo descargar o leer (o está vacío) no se declaran "Solo en SRI"; se listan como "XML no disponible" (se detecta por `(RUC emisor, N° retención)`). El conteo va en `resumen.retenciones_fallidos` y en `advertencias`.
+- Odoo cancelada/borrador queda "Informativo"; Odoo publicado solo cuenta como "Solo en Odoo" si su fecha cae en el período.
+- El período de las retenciones se calcula con sus propias fechas (mes dominante) y su propia ventana de lectura en Odoo, independiente de la de compras.
+- Si el TXT de retenciones no tiene ninguna fecha de emisión válida el job termina en `error`.
+- La pestaña "Retenciones" original (TXT + `reten_odoo.xlsx`) sigue disponible.

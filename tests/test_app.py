@@ -200,3 +200,20 @@ def test_upload_compras_rechaza_no_txt_mas_de_5_y_vacio(client, monkeypatch):
     seis = [("sri", (f"{i}.txt", b"x", "text/plain")) for i in range(6)]
     assert client.post("/upload-compras", cookies=cookies, files=seis).status_code == 400
     assert client.post("/upload-compras", cookies=cookies).status_code in (400, 422)
+
+
+def test_upload_compras_acepta_txt_de_retenciones(client, monkeypatch):
+    import app as app_module
+    monkeypatch.setattr(app_module, "run_pipeline_compras", lambda job_id: None)
+    cookies = _login(client)
+    r = client.post("/upload-compras", cookies=cookies,
+                    files=[("sri", ("retenciones.txt", b"x", "text/plain"))])
+    assert r.status_code == 200
+    assert "job_id" in r.json()
+
+
+def test_index_menciona_retenciones_en_compras(client):
+    cookies = _login(client)
+    html = client.get("/", cookies=cookies).text
+    assert "facturas, notas de crédito, notas de débito y retenciones" in html
+    assert "cualquier subconjunto" in html

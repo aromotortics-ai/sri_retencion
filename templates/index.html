@@ -96,7 +96,7 @@
       <div class="field">
         <label>TXT del portal SRI (comprobantes recibidos)</label>
         <input type="file" id="compras-files" accept=".txt" multiple>
-        <p class="file-count" id="compras-count">Hasta 5 archivos: facturas, notas de crédito y notas de débito. Las compras se leen de Odoo automáticamente.</p>
+        <p class="file-count" id="compras-count">Hasta 5 archivos: facturas, notas de crédito, notas de débito y retenciones; puedes subirlos juntos o cualquier subconjunto. Los datos de Odoo se leen automáticamente.</p>
       </div>
     </div>
     <button id="btn-procesar" onclick="startJob()">Procesar</button>
@@ -261,14 +261,20 @@
   }
 
   function showResultCompras(job_id, resumen) {
-    const nombres = { FAC: "Facturas", NC: "Notas de crédito", ND: "Notas de débito" };
+    const nombres = { FAC: "Facturas", NC: "Notas de crédito", ND: "Notas de débito",
+                      retenciones: "Retenciones" };
     const filas = [["coinciden","Coinciden",0],["diferencias","Diferencias de valor",1],
                    ["solo_sri","Solo en SRI · falta en Odoo",1],["solo_odoo","Solo en Odoo · revisar",1],
                    ["informativos","Informativos (no aplica)",0]];
+    // Las retenciones usan "diferencia" (singular) y añaden "factura_incorrecta".
+    const filasRet = [["coinciden","Coinciden",0],["diferencia","Diferencias de valor",1],
+                      ["solo_sri","Solo en SRI · falta en Odoo",1],["solo_odoo","Solo en Odoo · revisar",1],
+                      ["factura_incorrecta","Factura incorrecta en Odoo",1],
+                      ["informativos","Informativos (no aplica)",0]];
     let html = "";
     for (const [tipo, c] of Object.entries(resumen.por_tipo || {})) {
       html += `<span class="stat-sub">${nombres[tipo] || esc(tipo)}</span>`;
-      html += filas.map(([k, label, aviso]) =>
+      html += (tipo === "retenciones" ? filasRet : filas).map(([k, label, aviso]) =>
         `<span class="stat-label">${label}</span>` +
         `<span class="stat-value ${k === "coinciden" ? "ok" : (aviso ? (c[k] > 0 ? "warn" : "ok") : "")}">${c[k] ?? "&#x2014;"}</span>`
       ).join("");

@@ -7,7 +7,7 @@ import pandas as pd
 import odoo_client
 from job_manager import create_job, get_job_dir, read_status
 from odoo_client import OdooError
-from test_xml_cache import _autorizacion
+from _helpers import _autorizacion
 
 
 def _job(tmp_path, monkeypatch):
@@ -144,7 +144,7 @@ CLAVE_R1 = "1" * 49
 CLAVE_R2 = "2" * 49
 N_RET1 = "001-200-000004340"  # el n_ret que trae el XML sintetico de test_xml_cache
 N_RET2 = "001-200-000004341"
-ADV_FALLIDOS = ("1 XML de retenciones no se pudieron descargar; sus retenciones se listan como "
+ADV_FALLIDOS = ("1 XML de retenciones no se pudieron descargar o leer; sus retenciones se listan como "
                 "'XML no disponible'")
 
 
@@ -411,3 +411,13 @@ def test_pipeline_error_de_odoo_no_filtra_credenciales(tmp_path, monkeypatch):
     for v in secretos.values():
         assert v not in crudo
     assert "clave-url-777" not in crudo
+
+
+def test_pipeline_retenciones_sin_fechas_validas_es_error_claro(tmp_path, monkeypatch):
+    pc, job_id, _, _, llamadas, _ = _entorno(
+        tmp_path, monkeypatch, {"ret.txt": [_ret_txt(CLAVE_R1, fecha="")]})
+    pc.run_pipeline_compras(job_id)
+    s = read_status(job_id)
+    assert s["estado"] == "error"
+    assert "fechas de emisión válidas" in s["mensaje"]
+    assert llamadas == []  # no se intentó descargar nada

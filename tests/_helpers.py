@@ -1,0 +1,38 @@
+"""Helpers compartidos entre tests (importar como `from _helpers import ...`)."""
+
+
+def _autorizacion(clave, version, num_doc="001003000088766"):
+    if version == "1.0.0":
+        cuerpo = (
+            "<impuestos><impuesto><codigo>1</codigo><codigoRetencion>312</codigoRetencion>"
+            "<baseImponible>100.00</baseImponible><porcentajeRetener>1.75</porcentajeRetener>"
+            f"<valorRetenido>1.75</valorRetenido><codDocSustento>01</codDocSustento>"
+            f"<numDocSustento>{num_doc}</numDocSustento>"
+            "<fechaEmisionDocSustento>01/09/2026</fechaEmisionDocSustento></impuesto></impuestos>"
+        )
+    else:
+        cuerpo = (
+            "<docsSustento><docSustento><codDocSustento>01</codDocSustento>"
+            f"<numDocSustento>{num_doc}</numDocSustento>"
+            "<fechaEmisionDocSustento>01/09/2026</fechaEmisionDocSustento>"
+            "<retenciones><retencion><codigo>1</codigo><codigoRetencion>312</codigoRetencion>"
+            "<baseImponible>100.00</baseImponible><porcentajeRetener>1.75</porcentajeRetener>"
+            "<valorRetenido>1.75</valorRetenido></retencion></retenciones>"
+            "</docSustento></docsSustento>"
+        )
+    comp = (
+        f'<comprobanteRetencion version="{version}"><infoTributaria>'
+        f"<razonSocial>PROVEEDOR SA</razonSocial><ruc>1790000000001</ruc>"
+        f"<claveAcceso>{clave}</claveAcceso><estab>001</estab><ptoEmi>200</ptoEmi>"
+        "<secuencial>000004340</secuencial></infoTributaria>"
+        "<infoCompRetencion><fechaEmision>05/09/2026</fechaEmision>"
+        "<identificacionSujetoRetenido>2390000831001</identificacionSujetoRetenido>"
+        "<razonSocialSujetoRetenido>EMPRESA</razonSocialSujetoRetenido>"
+        f"<periodoFiscal>09/2026</periodoFiscal></infoCompRetencion>{cuerpo}"
+        "</comprobanteRetencion>"
+    )
+    return (
+        "<autorizacion><estado>AUTORIZADO</estado><numeroAutorizacion>"
+        f"{clave}</numeroAutorizacion><fechaAutorizacion>2026-09-05</fechaAutorizacion>"
+        f"<comprobante><![CDATA[{comp}]]></comprobante></autorizacion>"
+    )

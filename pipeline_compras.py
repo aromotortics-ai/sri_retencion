@@ -104,7 +104,7 @@ def run_pipeline_compras(job_id: str) -> None:
             resumen["retenciones_fallidos"] = n_sin_xml
             if n_sin_xml:
                 resumen["advertencias"].append(
-                    f"{n_sin_xml} XML de retenciones no se pudieron descargar; sus retenciones "
+                    f"{n_sin_xml} XML de retenciones no se pudieron descargar o leer; sus retenciones "
                     "se listan como 'XML no disponible'")
         write_status(job_id, "done", "Completado", 1.0, resumen=resumen)
         schedule_cleanup(job_id, delay_seconds=7200)
