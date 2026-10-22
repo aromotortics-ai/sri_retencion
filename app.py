@@ -17,6 +17,7 @@ from auth import verify_user
 from job_manager import create_job, read_status, get_job_dir, mark_stale_jobs_as_error
 from pipeline import run_pipeline
 from pipeline_ventas import run_pipeline_ventas
+from pipeline_compras import run_pipeline_compras
 
 BASE_DIR       = Path(__file__).parent
 USERS_FILE     = str(BASE_DIR / "data" / "users.yaml")
@@ -150,6 +151,30 @@ async def upload_ventas(
         dest.write_bytes(await f.read())
 
     threading.Thread(target=run_pipeline_ventas, args=(job_id,), daemon=True).start()
+    return {"job_id": job_id}
+
+
+@app.post("/upload-compras")
+async def upload_compras(
+    sri: list[UploadFile] = File(...),
+    _user: str = Depends(require_session),
+):
+    if not 1 <= len(sri) <= 5:
+        raise HTTPException(status_code=400, detail="Sube entre 1 y 5 archivos TXT del SRI")
+    nombres = [Path((f.filename or "").replace("\\", "/")).name for f in sri]
+    if any(not n.lower().endswith(".txt") for n in nombres):
+        raise HTTPException(status_code=400, detail="Todos los archivos deben ser .txt")
+
+    job_id  = create_job()
+    job_dir = get_job_dir(job_id)
+    (job_dir / "sri").mkdir()
+    for i, (f, nombre) in enumerate(zip(sri, nombres)):
+        dest = job_dir / "sri" / nombre
+        if dest.exists():
+            dest = job_dir / "sri" / f"{i}_{nombre}"
+        dest.write_bytes(await f.read())
+
+    threading.Thread(target=run_pipeline_compras, args=(job_id,), daemon=True).start()
     return {"job_id": job_id}
 
 

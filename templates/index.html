@@ -49,6 +49,10 @@
            border-radius: 4px 4px 0 0; font-size: .9rem; }
     .tab:hover { background: #eef2f7; }
     .tab.active { color: #1F4E78; font-weight: bold; border-bottom: 3px solid #1F4E78; margin-bottom: -2px; }
+    .stat-sub { grid-column: 1 / -1; font-weight: bold; color: #1F4E78; margin-top: .5rem;
+                border-bottom: 1px solid #e0e7ef; }
+    .stat-note { grid-column: 1 / -1; font-size: .8rem; color: #7a5b00; background: #fff6dd;
+                 border-radius: 4px; padding: .4rem .6rem; }
     .file-count { font-size: .78rem; color: #666; margin-top: .3rem; }
   </style>
 </head>
@@ -62,6 +66,7 @@
   <div class="tabs">
     <button class="tab active" id="tab-retenciones" onclick="setMode('retenciones')">Retenciones</button>
     <button class="tab" id="tab-ventas" onclick="setMode('ventas')">Ventas</button>
+    <button class="tab" id="tab-compras" onclick="setMode('compras')">Compras</button>
   </div>
 
   <!-- Formulario -->
@@ -85,6 +90,13 @@
       <div class="field">
         <label>2. Facturas de cliente de Odoo (.xlsx)</label>
         <input type="file" id="odoo-venta-file" accept=".xlsx">
+      </div>
+    </div>
+    <div id="form-compras" style="display:none;">
+      <div class="field">
+        <label>TXT del portal SRI (comprobantes recibidos)</label>
+        <input type="file" id="compras-files" accept=".txt" multiple>
+        <p class="file-count" id="compras-count">Hasta 5 archivos: facturas, notas de crédito y notas de débito. Las compras se leen de Odoo automáticamente.</p>
       </div>
     </div>
     <button id="btn-procesar" onclick="startJob()">Procesar</button>
@@ -121,7 +133,7 @@
 
   function setMode(m) {
     mode = m;
-    ["retenciones","ventas"].forEach(k => {
+    ["retenciones","ventas","compras"].forEach(k => {
       document.getElementById("tab-" + k).classList.toggle("active", k === m);
       document.getElementById("form-" + k).style.display = k === m ? "block" : "none";
     });
@@ -129,6 +141,11 @@
   }
 
   document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("compras-files").addEventListener("change", e => {
+      const n = e.target.files.length;
+      document.getElementById("compras-count").textContent =
+        n ? `${n} archivo${n === 1 ? "" : "s"} seleccionado${n === 1 ? "" : "s"}` : "";
+    });
     document.getElementById("emitidos-files").addEventListener("change", e => {
       const n = e.target.files.length;
       document.getElementById("emitidos-count").textContent =
@@ -144,7 +161,13 @@
   async function startJob() {
     const fd = new FormData();
     let url;
-    if (mode === "ventas") {
+    if (mode === "compras") {
+      const txts = document.getElementById("compras-files").files;
+      if (!txts.length) { alert("Selecciona los TXT del SRI."); return; }
+      if (txts.length > 5) { alert("Máximo 5 archivos."); return; }
+      for (const f of txts) fd.append("sri", f);
+      url = "/upload-compras";
+    } else if (mode === "ventas") {
       const txts = document.getElementById("emitidos-files").files;
       const xlsx = document.getElementById("odoo-venta-file").files[0];
       if (!txts.length || !xlsx) { alert("Selecciona los TXT del SRI y el Excel de Odoo."); return; }
@@ -205,6 +228,7 @@
   function showResult(job_id, resumen) {
     show("result-section");
     const grid = document.getElementById("stat-grid");
+    if (mode === "compras") { showResultCompras(job_id, resumen); return; }
     const rows = mode === "ventas" ? [
       ["Facturas en SRI",              resumen.n_sri,               ""],
       ["Facturas en Odoo",             resumen.n_odoo,              ""],
@@ -232,6 +256,28 @@
     };
   }
 
+  function esc(t) {
+    return String(t).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+
+  function showResultCompras(job_id, resumen) {
+    const nombres = { FAC: "Facturas", NC: "Notas de crédito", ND: "Notas de débito" };
+    const filas = [["coinciden","Coinciden",0],["diferencias","Diferencias de valor",1],
+                   ["solo_sri","Solo en SRI · falta en Odoo",1],["solo_odoo","Solo en Odoo · revisar",1],
+                   ["informativos","Informativos (no aplica)",0]];
+    let html = "";
+    for (const [tipo, c] of Object.entries(resumen.por_tipo || {})) {
+      html += `<span class="stat-sub">${nombres[tipo] || esc(tipo)}</span>`;
+      html += filas.map(([k, label, aviso]) =>
+        `<span class="stat-label">${label}</span>` +
+        `<span class="stat-value ${k === "coinciden" ? "ok" : (aviso ? (c[k] > 0 ? "warn" : "ok") : "")}">${c[k] ?? "&#x2014;"}</span>`
+      ).join("");
+    }
+    html += (resumen.advertencias || []).map(a => `<span class="stat-note">&#x26A0; ${esc(a)}</span>`).join("");
+    document.getElementById("stat-grid").innerHTML = html;
+    document.getElementById("btn-download").onclick = () => { window.location = `/download/${job_id}`; };
+  }
+
   function showError(msg) {
     show("error-section");
     document.getElementById("error-msg").textContent = msg;
@@ -243,6 +289,7 @@
     document.getElementById("txt-file").value = "";
     document.getElementById("xlsx-file").value = "";
     document.getElementById("emitidos-files").value = "";
+    document.getElementById("compras-files").value = "";
     document.getElementById("odoo-venta-file").value = "";
     document.getElementById("emitidos-count").textContent =
       "Selecciona todos los emitidos_AAAA-MM-DD.txt del período.";

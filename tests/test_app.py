@@ -158,3 +158,45 @@ def test_download_ventas_name(client):
     (get_job_dir(job_id) / "resultado.xlsx").write_bytes(b"x")
     r = client.get(f"/download/{job_id}", cookies=cookies)
     assert r.status_code == 200
+
+
+def test_upload_compras_requiere_sesion(client):
+    r = client.post("/upload-compras", files=[("sri", ("a.txt", b"x", "text/plain"))])
+    assert r.status_code == 401
+
+
+def test_upload_compras_devuelve_job_id(client, monkeypatch):
+    import app as app_module
+    monkeypatch.setattr(app_module, "run_pipeline_compras", lambda job_id: None)
+    cookies = _login(client)
+    r = client.post("/upload-compras", cookies=cookies,
+                    files=[("sri", ("a.txt", b"x", "text/plain")), ("sri", ("b.txt", b"y", "text/plain"))])
+    assert r.status_code == 200
+    from job_manager import get_job_dir
+    d = get_job_dir(r.json()["job_id"]) / "sri"
+    assert sorted(p.name for p in d.iterdir()) == ["a.txt", "b.txt"]
+
+
+def test_upload_compras_nombre_con_ruta_no_escapa_del_job(client, monkeypatch):
+    import app as app_module
+    monkeypatch.setattr(app_module, "run_pipeline_compras", lambda job_id: None)
+    cookies = _login(client)
+    r = client.post("/upload-compras", cookies=cookies,
+                    files=[("sri", ("../../evil.txt", b"x", "text/plain")),
+                           ("sri", ("..\..\evil.txt", b"y", "text/plain"))])
+    assert r.status_code == 200
+    from job_manager import get_job_dir
+    d = get_job_dir(r.json()["job_id"])
+    assert not (d.parent.parent / "evil.txt").exists()
+    assert len(list((d / "sri").iterdir())) == 2
+
+
+def test_upload_compras_rechaza_no_txt_mas_de_5_y_vacio(client, monkeypatch):
+    import app as app_module
+    monkeypatch.setattr(app_module, "run_pipeline_compras", lambda job_id: None)
+    cookies = _login(client)
+    r = client.post("/upload-compras", cookies=cookies, files=[("sri", ("a.xlsx", b"x", "text/plain"))])
+    assert r.status_code == 400
+    seis = [("sri", (f"{i}.txt", b"x", "text/plain")) for i in range(6)]
+    assert client.post("/upload-compras", cookies=cookies, files=seis).status_code == 400
+    assert client.post("/upload-compras", cookies=cookies).status_code in (400, 422)

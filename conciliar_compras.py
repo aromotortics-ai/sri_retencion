@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
 """Conciliacion de comprobantes electronicos recibidos (facturas, NC y ND) SRI vs Odoo."""
+import os
+import shutil
+import subprocess
+import tempfile
+
 import pandas as pd
 
 TIPOS = ("FAC", "NC", "ND")
@@ -124,3 +129,37 @@ def conciliar(sri, odoo, desde, hasta):
     out["idx_sri"] = out["idx_sri"].astype("Int64")
     out["id_odoo"] = out["id_odoo"].astype("Int64")
     return out
+
+
+_NOMBRE_TIPO = {"FAC": "facturas", "NC": "notas de crédito", "ND": "notas de débito"}
+
+
+def _recalcular(ruta):
+    """Recalcula las fórmulas con LibreOffice. Devuelve True si se pudo."""
+    soffice = shutil.which("soffice")
+    if not soffice:
+        return False
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            subprocess.run([soffice, "--headless", "--convert-to", "xlsx", "--outdir", tmp, ruta],
+                           check=True, capture_output=True, timeout=120)
+            nuevo = os.path.join(tmp, os.path.basename(ruta))
+            if not os.path.exists(nuevo):
+                return False
+            shutil.move(nuevo, ruta)
+        return True
+    except Exception:
+        return False
+
+
+def conciliar_compras(rutas_txt, odoo, desde, hasta, salida):
+    """Concilia TXT del SRI contra Odoo, escribe el Excel y devuelve
+    {"por_tipo": {...}, "advertencias": [...]}."""
+    from excel_compras import construir_excel  # import tardío: excel_compras importa este módulo
+    sri = leer_sri_txts(rutas_txt)
+    pares = conciliar(sri, odoo, desde, hasta)
+    por_tipo = construir_excel(sri, odoo, pares, desde, hasta, salida)
+    advertencias = [f"Falta el TXT de {_NOMBRE_TIPO[t]}" for t in tipos_faltantes(sri)]
+    if not _recalcular(salida):
+        advertencias.append("No se pudo recalcular con LibreOffice; Excel recalculará las fórmulas al abrir el archivo")
+    return {"por_tipo": por_tipo, "advertencias": advertencias}

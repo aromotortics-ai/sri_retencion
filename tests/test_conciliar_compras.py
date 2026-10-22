@@ -183,3 +183,59 @@ def test_solo_sri_genera_fila_sin_id_odoo():
     r = conciliar(_sri({"clave": "1" * 49}), _odoo({"nfac": "Z", "total": 1.0}).iloc[0:0], D, H)
     assert len(r) == 1
     assert r.loc[0, "idx_sri"] == 0 and pd.isna(r.loc[0, "id_odoo"]) and r.loc[0, "tipo"] == "FAC"
+
+
+# ---- conciliar_compras (orquestación) ----
+from datetime import date
+
+from odoo_client import COLUMNAS as _COLS_ODOO
+
+
+def _odoo_vacio():
+    return pd.DataFrame(columns=_COLS_ODOO)
+
+
+def test_advertencia_por_tipo_faltante(tmp_path, monkeypatch):
+    import shutil
+    import conciliar_compras as cc
+    monkeypatch.setattr(shutil, "which", lambda *_: None)
+    p = _txt(tmp_path / "a.txt", [_fila("1" * 49)])
+    res = cc.conciliar_compras([p], _odoo_vacio(), date(2026, 9, 1), date(2026, 9, 30),
+                               str(tmp_path / "o.xlsx"))
+    assert "Falta el TXT de notas de crédito" in res["advertencias"]
+    assert "Falta el TXT de notas de débito" in res["advertencias"]
+    assert not any("facturas" in a for a in res["advertencias"])
+    assert any("LibreOffice" in a for a in res["advertencias"])
+    assert (tmp_path / "o.xlsx").exists()
+
+
+def test_resumen_por_tipo(tmp_path, monkeypatch):
+    import shutil
+    import conciliar_compras as cc
+    monkeypatch.setattr(shutil, "which", lambda *_: None)
+    p = _txt(tmp_path / "a.txt", [_fila("1" * 49), _fila("2" * 49, serie="001-001-000000002")])
+    res = cc.conciliar_compras([p], _odoo_vacio(), date(2026, 9, 1), date(2026, 9, 30),
+                               str(tmp_path / "o.xlsx"))
+    assert set(res["por_tipo"]) == {"FAC", "NC", "ND"}
+    assert res["por_tipo"]["FAC"]["solo_sri"] == 2
+
+
+def test_recalculo_libreoffice_si_existe(tmp_path, monkeypatch):
+    import shutil
+    import subprocess
+    import conciliar_compras as cc
+    llamadas = []
+    monkeypatch.setattr(shutil, "which", lambda *_: "/usr/bin/soffice")
+
+    def falso_run(cmd, **k):
+        llamadas.append(cmd)
+        import os
+        with open(os.path.join(cmd[cmd.index("--outdir") + 1], os.path.basename(cmd[-1])), "wb") as f:
+            f.write(b"recalculado")
+    monkeypatch.setattr(subprocess, "run", falso_run)
+    p = _txt(tmp_path / "a.txt", [_fila("1" * 49)])
+    res = cc.conciliar_compras([p], _odoo_vacio(), date(2026, 9, 1), date(2026, 9, 30),
+                               str(tmp_path / "o.xlsx"))
+    assert llamadas and "--convert-to" in llamadas[0]
+    assert not any("LibreOffice" in a for a in res["advertencias"])
+    assert (tmp_path / "o.xlsx").read_bytes() == b"recalculado"
