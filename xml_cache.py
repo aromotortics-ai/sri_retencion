@@ -3,6 +3,8 @@
 Descarga de XML de retenciones por clave de acceso (web service público del SRI)
 hacia el caché compartido y lectura de sus líneas como DataFrame.
 """
+import os
+import tempfile
 import time
 from pathlib import Path
 
@@ -35,6 +37,24 @@ def formatear_doc(v):
     return v
 
 
+def _escribir_atomico(destino, texto):
+    """Escribe en un temporal del mismo directorio y lo renombra: otro job que lea el caché ve el
+    archivo completo o no lo ve. El temporal (`<clave>.xml.<aleatorio>.tmp`) no coincide con
+    `<clave>.xml`, así que ni la verificación de caché ni lineas_sri lo consideran."""
+    destino = Path(destino)
+    fd, tmp = tempfile.mkstemp(dir=destino.parent, prefix=destino.name + ".", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(texto)
+        os.replace(tmp, destino)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
 def descargar_xmls(claves, cache_dir, on_progress=None, sesion=None, pausa_seg=0.5):
     """Descarga al caché solo las claves sin XML. Devuelve [{"clave", "motivo"}]."""
     cache_dir = Path(cache_dir)
@@ -54,10 +74,8 @@ def descargar_xmls(claves, cache_dir, on_progress=None, sesion=None, pausa_seg=0
             r.raise_for_status()
             autorizacion, motivo = evaluar_respuesta(r.text)
             if autorizacion:
-                (cache_dir / f"{clave}.xml").write_text(
-                    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' + autorizacion,
-                    encoding="utf-8",
-                )
+                _escribir_atomico(cache_dir / f"{clave}.xml",
+                                  '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' + autorizacion)
             else:
                 fallidos.append({"clave": clave, "motivo": motivo})
         except Exception as exc:

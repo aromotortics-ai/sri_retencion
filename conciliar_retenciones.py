@@ -147,13 +147,13 @@ def conciliar_retenciones(sri_lineas, odoo_lineas, sri_txt, desde, hasta):
     sri_lineas = sri_lineas if sri_lineas is not None else pd.DataFrame()
     odoo_lineas = odoo_lineas if odoo_lineas is not None else pd.DataFrame()
 
-    sri = sorted(_agregar(sri_lineas, ["clave", "ruc", "proveedor"]), key=_orden)
+    sri = sorted(_agregar(sri_lineas, ["clave", "ruc", "proveedor", "cod"]), key=_orden)
     if odoo_lineas.empty:
         posted, otros = odoo_lineas, odoo_lineas
     else:
         es_posted = odoo_lineas["estado"].fillna("") == "posted"
         posted, otros = odoo_lineas[es_posted], odoo_lineas[~es_posted]
-    odoo = sorted(_agregar(posted, ["id_ret", "ruc", "socio"]), key=_orden)
+    odoo = sorted(_agregar(posted, ["id_ret", "ruc", "socio", "cod"]), key=_orden)
 
     filas = []
     sri_libre = set(range(len(sri)))
@@ -186,7 +186,9 @@ def conciliar_retenciones(sri_lineas, odoo_lineas, sri_txt, desde, hasta):
         if cand:
             emparejar(i, cand[0], EST_FAC)
 
-    # (4) Porcentaje distinto: mismo n_ret y factura, distinto pct; uno a uno por valor cercano.
+    # (4) Porcentaje distinto: mismo n_ret y factura, distinto pct; uno a uno, prefiriendo el mismo
+    # codigo de retencion y luego el valor mas cercano. El codigo es solo preferencia (SRI y Odoo
+    # pueden usar sistemas de codigos distintos), nunca filtro.
     pares = []
     for i in sri_libre:
         s = sri[i]
@@ -195,8 +197,10 @@ def conciliar_retenciones(sri_lineas, odoo_lineas, sri_txt, desde, hasta):
         for j in odoo_libre:
             o = odoo[j]
             if o["n_ret"] == s["n_ret"] and o["factura"] == s["factura"] and o["pct"] != s["pct"]:
-                pares.append((abs(s["valor"] - o["valor"]), i, j))
-    for _, i, j in sorted(pares):
+                cs, co = _txt(s.get("cod")), _txt(o.get("cod"))
+                otro_cod = 0 if cs is not None and cs == co else 1
+                pares.append((otro_cod, abs(s["valor"] - o["valor"]), i, j))
+    for _, _, i, j in sorted(pares):
         if i in sri_libre and j in odoo_libre:
             emparejar(i, j, EST_DIF)
 
@@ -208,12 +212,13 @@ def conciliar_retenciones(sri_lineas, odoo_lineas, sri_txt, desde, hasta):
     con_lineas = set()
     if not sri_lineas.empty:
         con_lineas = {(_txt(r), _txt(n)) for r, n in zip(sri_lineas["ruc"], sri_lineas["n_ret"])}
-    sin_xml = {}  # (ruc, serie) -> clave, solo comprobantes del TXT sin ninguna linea SRI
+    sin_xml = {}  # (ruc, serie) -> fila del TXT, solo comprobantes sin ninguna linea SRI
     if sri_txt is not None and not sri_txt.empty:
-        for ruc, serie, clave in zip(sri_txt["ruc"], sri_txt["serie"], sri_txt["clave"]):
-            k = (_txt(ruc), _txt(serie))
+        for t in sri_txt.to_dict("records"):
+            k = (_txt(t["ruc"]), _txt(t["serie"]))
             if k[1] is not None and k not in con_lineas:
-                sin_xml.setdefault(k, clave)
+                sin_xml.setdefault(k, t)
+    usados = set()  # comprobantes sin XML ya representados por una fila de Odoo
     for j in sorted(odoo_libre):
         o = odoo[j]
         if not _en_periodo(o["fecha"], desde, hasta):
@@ -221,15 +226,25 @@ def conciliar_retenciones(sri_lineas, odoo_lineas, sri_txt, desde, hasta):
         ruc = _txt(o["ruc"])
         if ruc is not None:
             k = (ruc, o["n_ret"])
-            falta, clave = k in sin_xml, sin_xml.get(k)
+            cand = [k] if k in sin_xml else []
         else:
             # Sin RUC en Odoo: basta que algun comprobante del TXT con ese n_ret no tenga XML.
-            cand = [c for (_, serie), c in sin_xml.items() if serie == o["n_ret"]]
-            falta, clave = bool(cand), (cand[0] if len(cand) == 1 else None)
-        if falta:
+            cand = [k for k in sin_xml if k[1] == o["n_ret"]]
+        if cand:
+            clave = sin_xml[cand[0]]["clave"] if len(cand) == 1 else None
+            # Ambiguo (varios emisores con ese n_ret): consume uno solo, el primero libre, para que
+            # cada comprobante sin XML aparezca una vez.
+            usados.add(next((k for k in sorted(cand, key=str) if k not in usados), cand[0]))
             filas.append(_fila(EST_XML, o=o, clave=clave))
         else:
             filas.append(_fila(EST_SOLO_ODOO, o=o))
+    # Comprobantes del TXT sin XML ni fila de Odoo: posibles "Solo en SRI"; se listan siempre (el
+    # lado SRI no se filtra por periodo) con los datos del TXT.
+    for k in sorted((k for k in sin_xml if k not in usados), key=str):
+        t = sin_xml[k]
+        fila = _fila(EST_XML, clave=_txt(t["clave"]))
+        fila.update(n_ret=k[1], ruc=k[0], proveedor=_txt(t.get("proveedor")), fecha=t.get("fecha"))
+        filas.append(fila)
 
     # (6) Odoo cancelada/borrador: informativa, nunca participa del cruce.
     if not otros.empty:

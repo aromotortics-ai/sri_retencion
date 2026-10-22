@@ -172,16 +172,17 @@ def _recalcular(ruta):
         return False
 
 
-def conciliar_compras(rutas_txt, odoo, desde, hasta, salida, ret=None):
+def conciliar_compras(rutas_txt, odoo, desde, hasta, salida, ret=None, periodo_ret=None):
     """Concilia TXT del SRI contra Odoo, escribe el Excel y devuelve
     {"por_tipo": {...}, "advertencias": [...]}.
 
     ret: conciliación de retenciones ya calculada (DataFrame de conciliar_retenciones) o None si
-    no se cargó TXT de retenciones; con ret, por_tipo incluye "retenciones"."""
+    no se cargó TXT de retenciones; con ret, por_tipo incluye "retenciones".
+    periodo_ret: (desde, hasta) de las retenciones, rotulado en el Resumen del Excel."""
     from excel_compras import construir_excel  # import tardío: excel_compras importa este módulo
     sri = leer_sri_txts(rutas_txt)
     pares = conciliar(sri, odoo, desde, hasta)
-    por_tipo = construir_excel(sri, odoo, pares, desde, hasta, salida, ret=ret)
+    por_tipo = construir_excel(sri, odoo, pares, desde, hasta, salida, ret=ret, periodo_ret=periodo_ret)
     advertencias = [f"Falta el TXT de {_NOMBRE_TIPO[t]}" for t in tipos_faltantes(sri)]
     if ret is None:
         advertencias.append("Falta el TXT de retenciones")

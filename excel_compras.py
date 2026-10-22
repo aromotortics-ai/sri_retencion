@@ -55,7 +55,8 @@ def _hoja(wb, titulo, enc, filas, anchos, fmt=None):
     return ws
 
 
-def construir_excel(sri, odoo, pares, desde, hasta, salida, ret=None):
+def construir_excel(sri, odoo, pares, desde, hasta, salida, ret=None, periodo_ret=None):
+    """periodo_ret: (desde, hasta) de las retenciones (solo con ret); se rotula en el Resumen."""
     wb = Workbook()
     wb.remove(wb.active)
     ns, no = len(sri), len(odoo)
@@ -228,7 +229,8 @@ def construir_excel(sri, odoo, pares, desde, hasta, salida, ret=None):
     if ret is not None:
         from excel_retenciones import agregar_hojas_retenciones, fila_resumen_retenciones
         contadores_ret = agregar_hojas_retenciones(wb, ret)
-        sig = fila_resumen_retenciones(rs, tot + 1, len(ret)) + 1
+        sig = fila_resumen_retenciones(rs, tot + 1, len(ret), periodo=periodo_ret,
+                                       periodo_compras=(desde, hasta)) + 1
     _fuente(rs, 4)
     for col in "ABCDEFGHIJKLM":
         rs[f"{col}{tot}"].font = Font(name=FONT, bold=True)

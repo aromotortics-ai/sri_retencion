@@ -39,11 +39,15 @@ def periodo_sri(sri) -> tuple[date, date, date, date]:
 
 
 def _retenciones(job_id, sri_ret, lector):
-    """Descarga XML, lee Odoo y concilia retenciones. Devuelve (ret, desde, hasta, n_sin_xml)."""
+    """Lee Odoo, descarga XML y concilia retenciones. Devuelve (ret, desde, hasta, n_sin_xml)."""
     con_fecha = sri_ret[sri_ret["fecha"].notna()]
     if con_fecha.empty:
         raise ValueError("El TXT de retenciones no tiene fechas de emisión válidas")
     desde, hasta, fetch_desde, fetch_hasta = periodo_sri(con_fecha)
+
+    # Odoo primero: credenciales erróneas u Odoo caído fallan de inmediato, no tras la descarga.
+    write_status(job_id, "running", "Leyendo retenciones de Odoo...", 0.12)
+    odoo_ret = lector.fetch_retenciones(fetch_desde, fetch_hasta)
 
     claves = list(sri_ret["clave"])
     total = len(claves)
@@ -67,8 +71,7 @@ def _retenciones(job_id, sri_ret, lector):
     # Sin líneas = no descargado o XML ilegible/vacío: todos terminan como "XML no disponible".
     n_sin_xml = len(set(claves) - set(lineas["clave"]))
 
-    write_status(job_id, "running", "Leyendo retenciones de Odoo...", 0.7)
-    odoo_ret = lector.fetch_retenciones(fetch_desde, fetch_hasta)
+    write_status(job_id, "running", "Conciliando retenciones...", 0.7)
     ret = conciliar_retenciones(lineas, odoo_ret, sri_ret, desde, hasta)
     return ret, desde, hasta, n_sin_xml
 
@@ -85,9 +88,11 @@ def run_pipeline_compras(job_id: str) -> None:
                              "ni retenciones")
         lector = OdooReader.from_env()  # una sola conexión para compras y retenciones
 
-        ret, n_sin_xml = None, 0
+        ret, n_sin_xml, periodo_ret = None, 0, None
         if not sri_ret.empty:
-            ret, desde, hasta, n_sin_xml = _retenciones(job_id, sri_ret, lector)
+            ret, ret_desde, ret_hasta, n_sin_xml = _retenciones(job_id, sri_ret, lector)
+            periodo_ret = (ret_desde, ret_hasta)
+            desde, hasta = periodo_ret  # solo retenciones: hojas de compras con este período
 
         if not sri.empty:
             desde, hasta, fetch_desde, fetch_hasta = periodo_sri(sri)
@@ -99,7 +104,7 @@ def run_pipeline_compras(job_id: str) -> None:
 
         write_status(job_id, "running", "Conciliando SRI vs Odoo...", 0.85)
         resumen = conciliar_compras(rutas, odoo, desde, hasta, str(job_dir / "resultado.xlsx"),
-                                    ret=ret)
+                                    ret=ret, periodo_ret=periodo_ret)
         if ret is not None:
             resumen["retenciones_fallidos"] = n_sin_xml
             if n_sin_xml:

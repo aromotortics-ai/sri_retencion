@@ -38,8 +38,9 @@ def test_pipeline_compras_ok(tmp_path, monkeypatch):
     monkeypatch.setattr(pc.OdooReader, "from_env", classmethod(lambda cls: _Lector()))
     visto = {}
 
-    def falso(rutas, odoo, desde, hasta, salida, ret=None):
-        visto.update(rutas=rutas, desde=desde, hasta=hasta, salida=salida, ret=ret)
+    def falso(rutas, odoo, desde, hasta, salida, ret=None, periodo_ret=None):
+        visto.update(rutas=rutas, desde=desde, hasta=hasta, salida=salida, ret=ret,
+                     periodo_ret=periodo_ret)
         return {"por_tipo": {"FAC": {"coinciden": 1}}, "advertencias": []}
     monkeypatch.setattr(pc, "conciliar_compras", falso)
     (get_job_dir(job_id) / "sri" / "a.txt").write_text("x")
@@ -50,7 +51,7 @@ def test_pipeline_compras_ok(tmp_path, monkeypatch):
     assert _Lector.llamado == (date(2026, 9, 1), date(2026, 9, 30))
     assert (visto["desde"], visto["hasta"]) == (date(2026, 9, 1), date(2026, 9, 30))
     assert visto["salida"].endswith("resultado.xlsx")
-    assert visto["ret"] is None
+    assert visto["ret"] is None and visto["periodo_ret"] is None
 
 
 def _sri(*fechas):
@@ -107,7 +108,7 @@ def test_pipeline_ventana_amplia_para_odoo_y_mes_dominante_para_conciliar(tmp_pa
     monkeypatch.setattr(pc.OdooReader, "from_env", classmethod(lambda cls: _Lector()))
     visto = {}
     monkeypatch.setattr(pc, "conciliar_compras",
-                        lambda r, o, d, h, s, ret=None: visto.update(d=d, h=h) or {"por_tipo": {}, "advertencias": []})
+                        lambda r, o, d, h, s, ret=None, periodo_ret=None: visto.update(d=d, h=h) or {"por_tipo": {}, "advertencias": []})
     pc.run_pipeline_compras(job_id)
     assert read_status(job_id)["estado"] == "done"
     assert _Lector.llamado == (date(2026, 7, 20), date(2026, 9, 30))
@@ -421,3 +422,81 @@ def test_pipeline_retenciones_sin_fechas_validas_es_error_claro(tmp_path, monkey
     assert s["estado"] == "error"
     assert "fechas de emisión válidas" in s["mensaje"]
     assert llamadas == []  # no se intentó descargar nada
+
+
+def test_pipeline_un_xml_no_disponible_por_clave_fallida(tmp_path, monkeypatch):
+    # R1 con XML y gemelo; R2 sin XML con gemelo en Odoo; R3 sin XML y sin gemelo.
+    clave_r3, n_ret3 = "3" * 49, "001-200-000004342"
+    lector = _Odoo([_linea_odoo(), _linea_odoo(n_ret=N_RET2, id_ret=11)])
+
+    def descarga(claves, cache_dir, on_progress):
+        _xml(cache_dir, CLAVE_R1)
+        return [{"clave": CLAVE_R2, "motivo": "x"}, {"clave": clave_r3, "motivo": "x"}]
+    pc, job_id, _, _, _, _ = _entorno(
+        tmp_path, monkeypatch,
+        {"ret.txt": [_ret_txt(CLAVE_R1), _ret_txt(CLAVE_R2, serie=N_RET2),
+                     _ret_txt(clave_r3, serie=n_ret3)]},
+        lector=lector, descarga=descarga)
+    pc.run_pipeline_compras(job_id)
+    s = read_status(job_id)
+    assert s["estado"] == "done", s
+    assert s["resumen"]["retenciones_fallidos"] == 2
+    assert s["resumen"]["por_tipo"]["retenciones"]["informativos"] == 2
+    wb = openpyxl.load_workbook(get_job_dir(job_id) / "resultado.xlsx")
+    filas = list(wb["Ret_Conciliacion"].iter_rows(min_row=2, values_only=True))
+    xml = [f for f in filas if f[0] == "XML no disponible"]
+    assert len(xml) == s["resumen"]["retenciones_fallidos"]
+    assert sorted(f[-1] for f in xml) == sorted([CLAVE_R2, clave_r3])
+    por_clave = {f[-1]: f for f in xml}
+    assert por_clave[CLAVE_R2][14] == 11            # con gemelo: una sola fila, con datos de Odoo
+    assert por_clave[clave_r3][1] == n_ret3         # sin gemelo: lado SRI del TXT
+    assert por_clave[clave_r3][14] is None
+
+
+def test_pipeline_lee_odoo_antes_de_descargar(tmp_path, monkeypatch):
+    orden = []
+
+    class Lector(_Odoo):
+        def fetch_retenciones(self, desde, hasta, margen_dias=5):
+            orden.append("fetch_retenciones")
+            return super().fetch_retenciones(desde, hasta, margen_dias)
+
+    def descarga(claves, cache_dir, on_progress):
+        orden.append("descargar_xmls")
+        return []
+    pc, job_id, _, _, _, _ = _entorno(tmp_path, monkeypatch, {"ret.txt": [_ret_txt(CLAVE_R1)]},
+                                      lector=Lector(), descarga=descarga)
+    vistos = _espiar_status(pc, monkeypatch)
+    pc.run_pipeline_compras(job_id)
+    assert read_status(job_id)["estado"] == "done"
+    assert orden == ["fetch_retenciones", "descargar_xmls"]
+    mensajes = [m for m, _ in vistos]
+    assert mensajes.index("Leyendo retenciones de Odoo...") < min(
+        i for i, m in enumerate(mensajes) if m.startswith("Descargando"))
+    progresos = [p for _, p in vistos]
+    assert progresos == sorted(progresos)
+
+
+def test_pipeline_odoo_caido_falla_antes_de_descargar(tmp_path, monkeypatch):
+    class Caido(_Odoo):
+        def fetch_retenciones(self, desde, hasta, margen_dias=5):
+            raise OdooError("No se pudo conectar con Odoo")
+    pc, job_id, _, _, llamadas, _ = _entorno(tmp_path, monkeypatch, {"ret.txt": [_ret_txt(CLAVE_R1)]},
+                                             lector=Caido())
+    pc.run_pipeline_compras(job_id)
+    assert read_status(job_id)["estado"] == "error"
+    assert llamadas == []
+
+
+def test_pipeline_rotula_periodo_de_retenciones(tmp_path, monkeypatch):
+    pc, job_id, _, cache, _, _ = _entorno(
+        tmp_path, monkeypatch, {"fac.txt": [_fac()], "ret.txt": [_ret_txt(CLAVE_R1)]})
+    _xml(cache, CLAVE_R1)
+    pc.run_pipeline_compras(job_id)
+    assert read_status(job_id)["estado"] == "done"
+    wb = openpyxl.load_workbook(get_job_dir(job_id) / "resultado.xlsx")
+    rs = wb["Resumen"]
+    fila = [c.row for c in rs["A"] if c.value == "Retenciones"][0]
+    assert rs[f"B{fila}"].value == "2026-08"
+    textos = [c.value for row in rs.iter_rows() for c in row if isinstance(c.value, str)]
+    assert any("08/2026" in t for t in textos)

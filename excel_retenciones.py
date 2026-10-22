@@ -86,14 +86,17 @@ def agregar_hojas_retenciones(wb, ret):
                  ["n_ret", "fecha", "ruc", "proveedor", "factura_odoo", "pct_odoo", "base_odoo", "valor_odoo",
                   "id_ret"]),
           [18, 12, 15, 42, 19, 8, 12, 12, 9], {"B": "dd/mm/yyyy", "G": "#,##0.00", "H": "#,##0.00"})
-    _hoja(wb, "Ret_Diferencia_Valor",
-          ["N_Retencion", "Fecha", "Proveedor", "Factura", "Pct_SRI", "Pct_Odoo", "Base_SRI", "Base_Odoo",
-           "Valor_SRI", "Valor_Odoo", "Diferencia"],
-          _filas(ret[est == cr.EST_DIF],
-                 ["n_ret", "fecha", "proveedor", "factura_sri", "pct_sri", "pct_odoo", "base_sri", "base_odoo",
-                  "valor_sri", "valor_odoo", "dif_valor"]),
-          [18, 12, 42, 19, 8, 8, 12, 12, 12, 12, 11],
-          {"B": "dd/mm/yyyy", **{c: "#,##0.00" for c in "GHIJK"}})
+    ws_dif = _hoja(wb, "Ret_Diferencia_Valor",
+                   ["N_Retencion", "Fecha", "Proveedor", "Factura", "Pct_SRI", "Pct_Odoo", "Base_SRI", "Base_Odoo",
+                    "Valor_SRI", "Valor_Odoo", "Diferencia"],
+                   _filas(ret[est == cr.EST_DIF],
+                          ["n_ret", "fecha", "proveedor", "factura_sri", "pct_sri", "pct_odoo", "base_sri",
+                           "base_odoo", "valor_sri", "valor_odoo"]),
+                   [18, 12, 42, 19, 8, 8, 12, 12, 12, 12, 11],
+                   {"B": "dd/mm/yyyy", **{c: "#,##0.00" for c in "GHIJK"}})
+    # Diferencia = Valor_SRI - Valor_Odoo como formula (se escribe tras _proteger, que la volveria texto).
+    for rr in range(2, ws_dif.max_row + 1):
+        ws_dif[f"K{rr}"] = f"=ROUND(I{rr}-J{rr},2)"
     _hoja(wb, "Ret_Factura_Incorrecta",
           ["N_Retencion", "Fecha", "Proveedor", "Factura_SRI", "Factura_Odoo", "Pct", "Base", "Valor_SRI",
            "Valor_Odoo"],
@@ -122,12 +125,30 @@ def agregar_hojas_retenciones(wb, ret):
     }
 
 
-def fila_resumen_retenciones(rs, r, ret_n):
+def _texto_periodo(desde, hasta):
+    """'MM/AAAA' si es un mes calendario completo; si no, 'dd/mm/aaaa a dd/mm/aaaa'."""
+    d, h = pd.Timestamp(desde), pd.Timestamp(hasta)
+    if d.day == 1 and h == d + pd.offsets.MonthEnd(0):
+        return f"{d:%m/%Y}"
+    return f"{d:%d/%m/%Y} a {h:%d/%m/%Y}"
+
+
+def fila_resumen_retenciones(rs, r, ret_n, periodo=None, periodo_compras=None):
     """Escribe en la hoja Resumen (fila `r`) la fila 'Retenciones' con COUNTIFS sobre Ret_Conciliacion.
-    Mismas columnas que la tabla por tipo. Devuelve la fila siguiente libre."""
+    Mismas columnas que la tabla por tipo. Devuelve la fila siguiente libre.
+
+    periodo: (desde, hasta) de las retenciones; va en la columna Mes y, si difiere de
+    periodo_compras, se rotula en la nota bajo la fila."""
     lim = max(ret_n, 1) + 1
     est, vs, vo = (f"{HOJA_CONC}!${c}$2:${c}${lim}" for c in ("A", "L", "M"))
     rs[f"A{r}"] = "Retenciones"
+    nota_periodo = ""
+    if periodo is not None:
+        d, h = (pd.Timestamp(x) for x in periodo)
+        rs[f"B{r}"] = (f"{d:%Y-%m}" if _texto_periodo(d, h) == f"{d:%m/%Y}"
+                       else _texto_periodo(d, h))
+        if periodo_compras is None or tuple(pd.Timestamp(x) for x in periodo_compras) != (d, h):
+            nota_periodo = f'&"  |  Período de retenciones: {_texto_periodo(d, h)}"'
     rs[f"C{r}"] = f"=COUNT({vs})"
     for col, txt in zip("DEFG", (cr.EST_OK, cr.EST_DIF, cr.EST_SOLO_SRI, cr.EST_SOLO_ODOO)):
         rs[f"{col}{r}"] = f'=COUNTIFS({est},"{txt}")'
@@ -141,6 +162,6 @@ def fila_resumen_retenciones(rs, r, ret_n):
     for col in "KLM":
         rs[f"{col}{r}"].number_format = "#,##0.00"
     rs[f"A{r + 1}"] = (f'="Retenciones - factura incorrecta en Odoo: "&COUNTIFS({est},"{cr.EST_FAC}")'
-                       f'&"  |  XML no disponible: "&COUNTIFS({est},"{cr.EST_XML}")')
+                       f'&"  |  XML no disponible: "&COUNTIFS({est},"{cr.EST_XML}")' + nota_periodo)
     rs[f"A{r + 1}"].font = Font(name="Arial", italic=True, size=9)
     return r + 2

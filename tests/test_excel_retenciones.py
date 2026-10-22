@@ -121,6 +121,69 @@ def test_ret_diferencia_muestra_ambos_porcentajes(tmp_path):
     assert (f[enc.index("Base_SRI")], f[enc.index("Base_Odoo")]) == (1000.0, 500.0)
 
 
+def test_ret_diferencia_es_formula(tmp_path):
+    _, wb, _ = _construir(tmp_path)
+    ws = wb["Ret_Diferencia_Valor"]
+    enc = [c.value for c in ws[1]]
+    ci, cj, ck = (enc.index(h) + 1 for h in ("Valor_SRI", "Valor_Odoo", "Diferencia"))
+    assert (ci, cj, ck) == (9, 10, 11)
+    for r in range(2, ws.max_row + 1):
+        c = ws.cell(row=r, column=ck)
+        assert c.value == f"=ROUND(I{r}-J{r},2)" and c.data_type == "f", c.value
+        assert c.number_format == "#,##0.00"
+
+
+def test_ret_diferencia_formula_evalua(tmp_path):
+    formulas = pytest.importorskip("formulas")
+    _, wb, salida = _construir(tmp_path)
+    ws = wb["Ret_Diferencia_Valor"]
+    esperados = {r: round(ws[f"I{r}"].value - ws[f"J{r}"].value, 2) for r in range(2, ws.max_row + 1)}
+    sol = formulas.ExcelModel().loads(salida).finish().calculate()
+    for r, v in esperados.items():
+        k = [k for k in sol if k.upper().endswith(f"RET_DIFERENCIA_VALOR'!K{r}")]
+        assert k, r
+        assert float(sol[k[0]].value[0, 0]) == pytest.approx(v)
+
+
+def test_ret_xml_sin_gemelo_contadores_consistentes(tmp_path):
+    ret = _ret()
+    solo_xml = _fila(cr.EST_XML, n_ret="001-200-000000009", fac_s=None, fac_o=None, vs=None, vo=None,
+                     pct_s=None, pct_o=None)
+    solo_xml["clave"] = "1" * 49  # fila del lado SRI (TXT): clave sin valores
+    ret = pd.concat([ret, pd.DataFrame([solo_xml], columns=cr.COLUMNAS)], ignore_index=True)
+    ret["id_ret"] = pd.to_numeric(ret["id_ret"], errors="coerce").astype("Int64")
+    res, wb, _ = _construir(tmp_path, ret=ret)
+    n_info = wb["Ret_Informativos"].max_row - 1
+    assert res["retenciones"]["informativos"] == n_info == 3
+    assert res["retenciones"]["total_odoo"] == 60.0
+    filas = list(wb["Ret_Informativos"].iter_rows(min_row=2, values_only=True))
+    assert any(f[1] == "001-200-000000009" and f[-1] == "1" * 49 for f in filas)
+
+
+def _textos_resumen(wb):
+    return [c.value for row in wb["Resumen"].iter_rows() for c in row if isinstance(c.value, str)]
+
+
+def test_ret_periodo_distinto_se_rotula(tmp_path):
+    sri, odoo, pares = _vacios()
+    salida = str(tmp_path / "p.xlsx")
+    construir_excel(sri, odoo, pares, DESDE, HASTA, salida, ret=_ret(),
+                    periodo_ret=(date(2026, 8, 1), date(2026, 8, 31)))
+    wb = openpyxl.load_workbook(salida)
+    rs = wb["Resumen"]
+    fila = [c.row for c in rs["A"] if c.value == "Retenciones"][0]
+    assert rs[f"B{fila}"].value == "2026-08"
+    assert any("08/2026" in t for t in _textos_resumen(wb))
+
+
+def test_ret_periodo_igual_no_agrega_nota(tmp_path):
+    sri, odoo, pares = _vacios()
+    salida = str(tmp_path / "p.xlsx")
+    construir_excel(sri, odoo, pares, DESDE, HASTA, salida, ret=_ret(), periodo_ret=(DESDE, HASTA))
+    wb = openpyxl.load_workbook(salida)
+    assert not any("Período de retenciones" in t for t in _textos_resumen(wb))
+
+
 def test_construir_excel_sin_ret_no_cambia(tmp_path):
     sri, odoo, pares = _vacios()
     res = construir_excel(sri, odoo, pares, DESDE, HASTA, str(tmp_path / "n.xlsx"))

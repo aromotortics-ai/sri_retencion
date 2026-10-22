@@ -109,6 +109,31 @@ def test_descargar_xmls_guarda_autorizadas_y_reporta_fallidas(tmp_path):
     assert ses.llamadas[0][1]["Connection"] == "close"
 
 
+def test_descargar_xmls_escritura_atomica_sin_restos(tmp_path):
+    ses = FakeSession({CLAVE_V1: _autorizacion(CLAVE_V1, "1.0.0")})
+    assert descargar_xmls([CLAVE_V1], tmp_path, sesion=ses, pausa_seg=0) == []
+    assert sorted(p.name for p in tmp_path.iterdir()) == [f"{CLAVE_V1}.xml"]
+
+
+def test_descargar_xmls_escritura_fallida_no_deja_parcial(tmp_path, monkeypatch):
+    ses = FakeSession({CLAVE_V1: _autorizacion(CLAVE_V1, "1.0.0")})
+
+    def falla(*a, **k):
+        raise OSError("disco lleno")
+    monkeypatch.setattr(xml_cache.os, "replace", falla)
+    fallidos = descargar_xmls([CLAVE_V1], tmp_path, sesion=ses, pausa_seg=0)
+    assert [f["clave"] for f in fallidos] == [CLAVE_V1]
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_tmp_huerfano_no_cuenta_como_cache(tmp_path):
+    (tmp_path / f"{CLAVE_V1}.xml.abc.tmp").write_text("<parcial", encoding="utf-8")
+    ses = FakeSession({CLAVE_V1: _autorizacion(CLAVE_V1, "1.0.0")})
+    assert descargar_xmls([CLAVE_V1], tmp_path, sesion=ses, pausa_seg=0) == []
+    assert len(ses.llamadas) == 1
+    assert set(lineas_sri([CLAVE_V1], tmp_path)["clave"]) == {CLAVE_V1}
+
+
 def test_descargar_xmls_progreso(tmp_path):
     claves = [str(i).zfill(49) for i in range(12)]
     ses = FakeSession({c: _autorizacion(c, "1.0.0") for c in claves})

@@ -38,6 +38,10 @@ def _txt_df(*series):
                          for i, s in enumerate(series, 1)], columns=TXT_COLS)
 
 
+def _sin_txt():
+    return pd.DataFrame(columns=TXT_COLS)
+
+
 def _vacio_sri():
     return pd.DataFrame(columns=SRI_COLS)
 
@@ -79,7 +83,7 @@ def test_solo_en_sri():
 
 def test_solo_en_odoo():
     # La retención de Odoo no figura en el TXT del SRI: es "Solo en Odoo".
-    out = _run(_vacio_sri(), _odoo({"n_ret": "001-200-000009999"}))
+    out = _run(_vacio_sri(), _odoo({"n_ret": "001-200-000009999"}), _sin_txt())
     assert list(out["estado"]) == [EST_SOLO_ODOO]
     r = out.iloc[0]
     assert r["factura_odoo"] == "001-003-000088766" and pd.isna(r["clave"])
@@ -182,7 +186,7 @@ def test_lineas_repetidas_en_sri_se_suman():
 
 def test_odoo_fuera_de_periodo_sin_par_no_genera_fila():
     odoo = _odoo({"n_ret": "001-200-000009999", "fecha": pd.Timestamp("2026-08-28")})
-    out = _run(_vacio_sri(), odoo)
+    out = _run(_vacio_sri(), odoo, _sin_txt())
     assert out.empty
 
 
@@ -199,7 +203,7 @@ def test_sri_fuera_de_periodo_si_genera_fila():
 def test_odoo_sin_factura_no_se_pierde():
     odoo = _odoo({"n_ret": "001-200-000009999", "factura": pd.NA, "ruc": pd.NA},
                  {"n_ret": "001-200-000009998", "factura": pd.NA, "ruc": pd.NA, "id_ret": 11})
-    out = _run(_vacio_sri(), odoo)
+    out = _run(_vacio_sri(), odoo, _sin_txt())
     assert sorted(out["estado"]) == [EST_SOLO_ODOO, EST_SOLO_ODOO]
     assert sorted(out["id_ret"]) == [10, 11]
     assert out["factura_odoo"].isna().all()
@@ -208,6 +212,79 @@ def test_odoo_sin_factura_no_se_pierde():
 def test_odoo_sin_factura_no_cruza_con_sri_sin_factura():
     out = _run(_sri({"factura": pd.NA}), _odoo({"factura": pd.NA}))
     assert sorted(out["estado"]) == sorted([EST_SOLO_SRI, EST_SOLO_ODOO])
+
+
+def test_xml_fallido_sin_gemelo_en_odoo_se_lista():
+    # El XML falló y Odoo no tiene la retención: posible "Solo en SRI", nunca desaparece.
+    out = _run(_vacio_sri(), _vacio_odoo(), _txt_df("001-200-000004340"))
+    assert list(out["estado"]) == [EST_XML]
+    r = out.iloc[0]
+    assert r["n_ret"] == "001-200-000004340" and r["clave"] == "1" * 49
+    assert r["ruc"] == "1790000000001" and r["proveedor"] == "CLIENTE SA"
+    assert r["fecha"] == pd.Timestamp("2026-09-10")
+    assert pd.isna(r["id_ret"]) and pd.isna(r["valor_odoo"]) and pd.isna(r["factura_odoo"])
+    assert pd.isna(r["valor_sri"])
+
+
+def test_xml_fallido_sin_gemelo_fuera_de_periodo_se_lista():
+    txt = _txt_df("001-200-000004340")
+    txt["fecha"] = pd.Timestamp("2026-10-02")
+    out = _run(_vacio_sri(), _vacio_odoo(), txt)
+    assert list(out["estado"]) == [EST_XML]
+
+
+def test_xml_fallido_con_gemelo_una_sola_fila():
+    out = _run(_vacio_sri(), _odoo({}), _txt_df("001-200-000004340"))
+    assert list(out["estado"]) == [EST_XML]
+    assert out.iloc[0]["id_ret"] == 10 and out.iloc[0]["clave"] == "1" * 49
+
+
+def test_xml_fallido_con_gemelo_fuera_de_periodo_lista_el_lado_sri():
+    out = _run(_vacio_sri(), _odoo({"fecha": pd.Timestamp("2026-08-28")}),
+               _txt_df("001-200-000004340"))
+    assert list(out["estado"]) == [EST_XML]
+    assert pd.isna(out.iloc[0]["id_ret"]) and out.iloc[0]["clave"] == "1" * 49
+
+
+def test_xml_fallido_odoo_sin_ruc_consume_el_comprobante():
+    out = _run(_vacio_sri(), _odoo({"ruc": pd.NA}), _txt_df("001-200-000004340"))
+    assert list(out["estado"]) == [EST_XML]
+    assert out.iloc[0]["id_ret"] == 10
+
+
+def test_xml_fallido_odoo_sin_ruc_ambiguo_consume_uno_solo():
+    # Dos emisores con el mismo n_ret, ambos sin XML; Odoo (sin RUC) solo puede ser uno de ellos.
+    txt = pd.DataFrame([
+        {"clave": "1" * 49, "serie": "001-200-000004340", "ruc": "1790000000001", "proveedor": "A",
+         "fecha": pd.Timestamp("2026-09-10")},
+        {"clave": "2" * 49, "serie": "001-200-000004340", "ruc": "0990000000001", "proveedor": "B",
+         "fecha": pd.Timestamp("2026-09-10")},
+    ], columns=TXT_COLS)
+    out = _run(_vacio_sri(), _odoo({"ruc": pd.NA}), txt)
+    assert list(out["estado"]) == [EST_XML, EST_XML]
+    assert out["id_ret"].notna().sum() == 1
+    solo_sri = out[out["id_ret"].isna()]
+    assert len(solo_sri) == 1 and solo_sri.iloc[0]["clave"] in ("1" * 49, "2" * 49)
+
+
+def test_porcentaje_distinto_prefiere_mismo_codigo():
+    # SRI: Renta 2% (312) 2.00 + IVA 30% (725) 4.50. Odoo: solo Renta 1% (312) 4.00.
+    sri = _sri({"pct": 2.0, "cod": "312", "base": 100.0, "valor": 2.00},
+               {"pct": 30.0, "cod": "725", "base": 15.0, "valor": 4.50})
+    odoo = _odoo({"pct": 1.0, "cod": "312", "base": 400.0, "valor": 4.00})
+    out = _run(sri, odoo)
+    por_estado = {e: g for e, g in out.groupby("estado")}
+    assert sorted(out["estado"]) == sorted([EST_DIF, EST_SOLO_SRI])
+    dif = por_estado[EST_DIF].iloc[0]
+    assert (dif["pct_sri"], dif["pct_odoo"]) == (2.0, 1.0)
+    assert por_estado[EST_SOLO_SRI].iloc[0]["pct_sri"] == 30.0
+
+
+def test_porcentaje_distinto_codigo_es_preferencia_no_filtro():
+    # Códigos distintos (otro sistema de códigos en Odoo): igual se empareja por valor cercano.
+    out = _run(_sri({"pct": 2.0, "cod": "312", "valor": 11.60}),
+               _odoo({"pct": 1.0, "cod": "X-1", "valor": 5.80}))
+    assert list(out["estado"]) == [EST_DIF]
 
 
 @pytest.mark.parametrize("sri_vacio,odoo_vacio", [(True, True), (True, False), (False, True)])
