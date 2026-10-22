@@ -9,6 +9,7 @@ from pathlib import Path
 
 from job_manager import write_status, schedule_cleanup, get_job_dir
 from sri_session import sri_session
+from descargar_comprobantes_sri import evaluar_respuesta
 
 CACHE_XML_DIR = Path(__file__).parent / "cache" / "xml"
 
@@ -54,23 +55,15 @@ def run_pipeline(job_id: str) -> None:
             try:
                 r = session.post(ENDPOINT, data=body, headers=HEADERS, timeout=20)
                 r.raise_for_status()
-                match = re.search(r"<autorizacion>.*?</autorizacion>", r.text, re.DOTALL)
-                if match:
+                autorizacion, motivo = evaluar_respuesta(r.text)
+                if autorizacion:
                     dest = CACHE_XML_DIR / f"{clave}.xml"
                     dest.write_text(
-                        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' + match.group(0),
+                        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' + autorizacion,
                         encoding="utf-8",
                     )
                     ok += 1
                 else:
-                    # Extraer mensaje de error que devuelve el SRI si existe
-                    estado_m = re.search(r"<estado>(.*?)</estado>", r.text)
-                    mens_m = re.search(r"<mensaje>(.*?)</mensaje>", r.text)
-                    motivo = "sin <autorizacion> en respuesta"
-                    if estado_m:
-                        motivo = f"SRI estado={estado_m.group(1)}"
-                    if mens_m:
-                        motivo += f" — {mens_m.group(1)}"
                     fallidos.append({"clave": clave, "motivo": motivo})
             except Exception as exc:
                 fallidos.append({"clave": clave, "motivo": f"{type(exc).__name__}: {exc}"})

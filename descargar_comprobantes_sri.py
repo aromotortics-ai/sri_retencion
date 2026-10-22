@@ -52,13 +52,36 @@ def descargar_uno(clave_acceso, timeout=20):
     return resp.text  # respuesta SOAP completa; el XML del comprobante viene dentro
 
 
-def extraer_autorizacion(soap_response_text):
-    """Recorta el bloque <autorizacion>...</autorizacion> de la respuesta SOAP,
-    que es el mismo formato del XML que se descarga manualmente desde el portal."""
+def evaluar_respuesta(soap_response_text):
+    """Devuelve (autorizacion_xml, motivo). Solo acepta autorizaciones con
+    estado AUTORIZADO que traigan el <comprobante>; una respuesta RECHAZADA /
+    NO AUTORIZADO / sin comprobante devuelve (None, motivo) para no guardar
+    como XML válido un simple mensaje de error."""
     match = re.search(r"<autorizacion>.*?</autorizacion>", soap_response_text, re.DOTALL)
     if not match:
-        return None
-    return match.group(0)
+        return None, "no se encontró <autorizacion> en la respuesta"
+    bloque = match.group(0)
+    estado_m = re.search(r"<estado>(.*?)</estado>", bloque)
+    estado = estado_m.group(1).strip() if estado_m else None
+    if estado != "AUTORIZADO":
+        mens_m = re.search(r"<mensaje>(.*?)</mensaje>", bloque, re.DOTALL)
+        motivo = f"SRI estado={estado}"
+        if mens_m:
+            motivo += f" — {mens_m.group(1).strip()}"
+        info_m = re.search(r"<informacionAdicional>(.*?)</informacionAdicional>", bloque, re.DOTALL)
+        if info_m:
+            motivo += f" ({info_m.group(1).strip()})"
+        return None, motivo
+    if not re.search(r"<comprobante>\s*\S", bloque):
+        return None, "SRI estado=AUTORIZADO pero sin <comprobante>"
+    return bloque, None
+
+
+def extraer_autorizacion(soap_response_text):
+    """Recorta el bloque <autorizacion>...</autorizacion> de la respuesta SOAP,
+    que es el mismo formato del XML que se descarga manualmente desde el portal.
+    Devuelve None si el comprobante no está AUTORIZADO."""
+    return evaluar_respuesta(soap_response_text)[0]
 
 
 def descargar_lote(claves, carpeta_salida, pausa_seg=0.5):
@@ -70,9 +93,9 @@ def descargar_lote(claves, carpeta_salida, pausa_seg=0.5):
             continue
         try:
             soap_xml = descargar_uno(clave)
-            autorizacion_xml = extraer_autorizacion(soap_xml)
+            autorizacion_xml, motivo = evaluar_respuesta(soap_xml)
             if autorizacion_xml is None:
-                fallidos.append((clave, "no se encontró <autorizacion> en la respuesta"))
+                fallidos.append((clave, motivo))
                 continue
             destino = os.path.join(carpeta_salida, f"{clave}.xml")
             with open(destino, "w", encoding="utf-8") as f:
