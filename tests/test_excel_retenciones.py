@@ -408,3 +408,15 @@ def test_doc_formulas_sin_errores_multilinea(tmp_path):
     errores = [(k, v.value[0, 0]) for k, v in sol.items()
                if hasattr(v, "value") and v.value.size and isinstance(v.value[0, 0], formulas.functions.XlError)]
     assert not errores, errores[:5]
+
+
+def test_doc_mismo_id_odoo_con_ruc_distinto_cuenta_un_documento(tmp_path):
+    ret = pd.DataFrame([_fila(cr.EST_OK, ruc="1790000000001", id_ret=5),
+                        _fila(cr.EST_SOLO_ODOO, ruc="1790000000", fac_s=None, vs=None, pct_s=None, pct_o=30.0,
+                              id_ret=5)], columns=cr.COLUMNAS)
+    ret["id_ret"] = pd.to_numeric(ret["id_ret"], errors="coerce").astype("Int64")
+    res, wb, _ = _construir(tmp_path, ret=ret)
+    c = res["retenciones"]
+    assert (c["documentos"], c["diferencia"], c["coinciden"], c["solo_odoo"]) == (1, 1, 0, 0)
+    assert wb["Ret_Documentos"].max_row - 1 == 1
+    assert len({wb["Ret_Conciliacion"][f"Q{r}"].value for r in (2, 3)}) == 1

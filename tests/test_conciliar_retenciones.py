@@ -482,3 +482,35 @@ def test_doc_orden_determinista_por_fecha_y_numero():
 def test_doc_vacio():
     d = resumir_por_documento(pd.DataFrame(columns=COLUMNAS))
     assert d.empty and list(d.columns) == COLUMNAS_DOC
+
+
+# Un registro de Odoo (id_ret) es UN documento aunque el VAT del socio en Odoo difiera del RUC del SRI.
+
+def test_doc_mismo_id_odoo_con_ruc_distinto_es_un_documento():
+    d = resumir_por_documento(_lineas(_lin(EST_OK, ruc="1790000000001", id_ret=5),
+                                      _lin(EST_SOLO_ODOO, ruc="1790000000", vs=None, pct=30.0, id_ret=5)))
+    assert len(d) == 1
+    assert d.iloc[0]["estado"] == EST_DIF
+    assert d.iloc[0]["ruc"] == "1790000000001"  # se muestra el RUC del SRI
+
+
+def test_doc_mismo_id_odoo_con_ruc_distinto_integrado():
+    sri = _sri({"pct": 1.0, "valor": 1.0, "ruc": "1790000000001"})
+    odoo = _odoo({"id_ret": 5, "pct": 1.0, "valor": 1.0, "ruc": "1790000000"},
+                 {"id_ret": 5, "pct": 30.0, "valor": 4.5, "ruc": "1790000000"})
+    d = resumir_por_documento(_run(sri, odoo))
+    assert len(d) == 1 and d.iloc[0]["estado"] == EST_DIF
+    assert d.iloc[0]["ruc"] == "1790000000001"
+
+
+def test_doc_dos_clientes_mismo_numero_distinto_id_siguen_separados():
+    d = resumir_por_documento(_lineas(_lin(EST_OK, ruc="1790000000001", id_ret=5),
+                                      _lin(EST_SOLO_ODOO, ruc="0990000000001", vs=None, id_ret=6)))
+    assert len(d) == 2
+    assert sorted(d["estado"]) == sorted([EST_OK, EST_SOLO_ODOO])
+
+
+def test_doc_lineas_sin_id_no_unen_documentos():
+    d = resumir_por_documento(_lineas(_lin(EST_SOLO_SRI, ruc="1790000000001", vo=None),
+                                      _lin(EST_SOLO_SRI, ruc="0990000000001", vo=None, pct=30.0)))
+    assert len(d) == 2

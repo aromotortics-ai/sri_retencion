@@ -314,7 +314,46 @@ def documento_por_linea(ret):
         else:
             k = f"{SIN_NUMERO} fila {pos + 1}"
         claves.append(k.translate(_COMODINES))
-    return pd.Series(claves, index=ret.index, dtype=object)
+    return pd.Series(_unir_por_id_odoo(ret, claves), index=ret.index, dtype=object)
+
+
+def _unir_por_id_odoo(ret, claves):
+    """Un registro de Odoo (id_ret) es UN documento: une (union-find) las claves que comparten id_ret
+    (y N°).
+
+    Evita partir una retencion cuando el VAT del socio en Odoo difiere del RUC del SRI (las lineas
+    emparejadas llevan el RUC del SRI y las solo-Odoo el de Odoo). Las lineas sin id_ret nunca unen
+    por si mismas. Clave sobreviviente: la menor de las que tienen lineas del lado SRI; si ninguna
+    tiene, la menor de todas."""
+    padre = {k: k for k in claves}
+
+    def raiz(k):
+        while padre[k] != k:
+            padre[k] = padre[padre[k]]
+            k = padre[k]
+        return k
+
+    primera_por_id = {}
+    for k, id_ret, n in zip(claves, ret["id_ret"], ret["n_ret"]):
+        if id_ret is None or pd.isna(id_ret):
+            continue
+        # (id_ret, N°): un registro de Odoo tiene un solo N°; nunca se unen N° distintos.
+        otra = primera_por_id.setdefault((int(id_ret), _txt(n)), k)
+        a, b = raiz(k), raiz(otra)
+        if a != b:
+            padre[max(a, b)] = min(a, b)
+    con_sri = {k for k, v in zip(claves, ret["valor_sri"]) if v is not None and not pd.isna(v)}
+    con_sri |= {k for k, c in zip(claves, ret["clave"]) if _txt(c) is not None}
+    grupos = {}
+    for k in padre:
+        grupos.setdefault(raiz(k), []).append(k)
+    final = {}
+    for miembros in grupos.values():
+        lado_sri = [k for k in miembros if k in con_sri]
+        destino = min(lado_sri) if lado_sri else min(miembros)
+        for k in miembros:
+            final[k] = destino
+    return [final[k] for k in claves]
 
 
 def _plural(n, singular, plural):
@@ -394,6 +433,7 @@ def resumir_por_documento(ret: pd.DataFrame) -> pd.DataFrame:
         cons = g if estado == EST_INFO else g[g["estado"] != EST_INFO]
         vs = pd.to_numeric(cons["valor_sri"], errors="coerce")
         vo = pd.to_numeric(cons["valor_odoo"], errors="coerce")
+        lado_sri = vs.notna() | cons["clave"].notna()
         fechas = pd.to_datetime(g["fecha"], errors="coerce").dropna()
         ids = [int(x) for x in cons["id_ret"] if x is not None and not pd.isna(x)]
         filas.append({
@@ -401,8 +441,8 @@ def resumir_por_documento(ret: pd.DataFrame) -> pd.DataFrame:
             "estado": estado,
             "n_ret": _primero(cons["n_ret"]),
             "fecha": fechas.min() if len(fechas) else pd.NaT,
-            "ruc": _primero(cons["ruc"]),
-            "proveedor": _primero(cons["proveedor"]),
+            "ruc": _primero(pd.concat([cons.loc[lado_sri, "ruc"], cons["ruc"]])),  # RUC del SRI primero
+            "proveedor": _primero(pd.concat([cons.loc[lado_sri, "proveedor"], cons["proveedor"]])),
             "factura_sri": ", ".join(_unicos(cons["factura_sri"])) or None,
             "factura_odoo": ", ".join(_unicos(cons["factura_odoo"])) or None,
             "n_lineas_sri": int(vs.notna().sum()),
