@@ -55,3 +55,72 @@ def tipos_faltantes(sri):
     """Tipos de TIPOS sin ninguna fila en el DataFrame del SRI."""
     presentes = set(sri["tipo"])
     return [t for t in TIPOS if t not in presentes]
+
+
+CAT_INFO = "No aplica (informativo)"
+CAT_DUP = "Duplicado en Odoo"
+CAT_SOLO_ODOO = "Solo en Odoo"
+TOL_CENTAVOS = 2  # tolerancia de $0.02
+
+
+def _centavos(v):
+    return int(round(abs(float(v)) * 100)) if pd.notna(v) else None
+
+
+def _mismo_total(a, b):
+    ca, cb = _centavos(a), _centavos(b)
+    return ca is not None and cb is not None and abs(ca - cb) <= TOL_CENTAVOS
+
+
+def _ruc_compatible(a, b):
+    """True si los RUC coinciden o si alguno de los lados no lo tiene."""
+    return pd.isna(a) or pd.isna(b) or str(a) == str(b)
+
+
+def conciliar(sri, odoo, desde, hasta):
+    """Cruza SRI vs Odoo por tipo. Devuelve idx_sri, id_odoo, tipo, metodo, cat (una fila por pareja
+    y una por cada lado sin pareja)."""
+    por_clave, por_serie, por_afectada = {}, {}, {}
+    for i, r in sri.iterrows():
+        por_clave[(r["tipo"], r["clave"])] = i
+        por_serie.setdefault((r["tipo"], r["serie"]), []).append(i)
+        if r["tipo"] == "NC" and pd.notna(r["afectada"]):
+            por_afectada.setdefault(r["afectada"], []).append(i)
+
+    usados, filas = set(), []
+
+    def buscar(o):
+        t = o["tipo"]
+        if pd.notna(o["clave"]) and (t, o["clave"]) in por_clave:
+            return por_clave[(t, o["clave"])], "Clave de acceso"
+        cand = [i for i in por_serie.get((t, o["nfac"]), []) if _ruc_compatible(sri.at[i, "ruc"], o["ruc"])]
+        iguales = [i for i in cand if _mismo_total(sri.at[i, "total"], o["total"])]
+        if iguales:
+            libres = [i for i in iguales if i not in usados]
+            return (libres or iguales)[0], "N° documento + importe"
+        if len(cand) == 1:
+            return cand[0], "N° documento (importe distinto)"
+        if t == "NC" and pd.notna(o["afectada"]):
+            for i in por_afectada.get(o["afectada"], []):
+                if _ruc_compatible(sri.at[i, "ruc"], o["ruc"]) and _mismo_total(sri.at[i, "total"], o["total"]):
+                    return i, "NC: factura afectada + importe"
+        return None, ""
+
+    for _, o in odoo.iterrows():
+        idx, metodo = (None, "") if not o["elegible"] else buscar(o)
+        if idx is not None:
+            cat = CAT_DUP if idx in usados else ""
+            usados.add(idx)
+            filas.append((idx, o["id"], o["tipo"], metodo, cat))
+            continue
+        if not (desde <= pd.Timestamp(o["fecha"]).date() <= hasta):
+            continue
+        filas.append((None, o["id"], o["tipo"], "", CAT_INFO if not o["elegible"] else CAT_SOLO_ODOO))
+
+    for i in sri.index:
+        if i not in usados:
+            filas.append((i, None, sri.at[i, "tipo"], "", ""))
+    out = pd.DataFrame(filas, columns=["idx_sri", "id_odoo", "tipo", "metodo", "cat"])
+    out["idx_sri"] = out["idx_sri"].astype("Int64")
+    out["id_odoo"] = out["id_odoo"].astype("Int64")
+    return out
