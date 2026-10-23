@@ -42,7 +42,7 @@ Exportar retenciones de Odoo  →      5. conciliar_odoo.py
 | `parse_comprobante_xml.py` | Parsea cada XML descargado: cabecera + una fila por cada línea de retención. Soporta **v1.0.0** (`<impuestos>/<impuesto>`) y **v2.0.0** (`<docsSustento>/<docSustento>/<retenciones>/<retencion>`). |
 | `build_workbook_final.py` | Genera `Comprobantes_Retencion_<periodo>_Final.xlsx` con 5 hojas: `SRI_Listado`, `SRI_Detalle_Retenciones` (incluye columna `N_Retencion` y `Num_Doc_Sustento` formateados con guiones), `SRI_Por_Doc_Sustento`, `ERP_Compras`, `Conciliacion`. |
 | `conciliar_odoo.py` | Cruza `SRI_Detalle_Retenciones` contra `reten_odoo.xlsx` y añade 4 hojas al Excel: `Conciliacion_Odoo` (resumen), `Solo_en_SRI`, `Solo_en_Odoo`, `Diferencias_Valor`, `Factura_Incorrecta_Odoo`. |
-| `conciliar_emitidas.py` | Concilia retenciones **EMITIDAS** (la empresa retiene a proveedores): TXT diarios `retenciones_emitidas/emitidos_AAAA-MM-DD.txt` vs Excel de Odoo. Cruza por N° de retención a nivel de comprobante (el TXT no trae montos y el WS público solo guarda XML de ~30 días). Genera `Conciliacion_Retenciones_Emitidas_*.xlsx` con `Resumen_Mensual`, `Conciliacion`, `Solo_en_SRI`, `Solo_en_Odoo`, `Fecha_distinta`. Uso: `python conciliar_emitidas.py odoo.xlsx retenciones_emitidas salida.xlsx [desde] [hasta]` |
+| `conciliar_emitidas.py` | Concilia retenciones **EMITIDAS** (la empresa retiene a proveedores): TXT diarios `retenciones_emitidas/emitidos_AAAA-MM-DD.txt` vs Excel de Odoo. Cruza por N° de retención a nivel de comprobante (el TXT no trae montos y el WS público solo guarda XML de ~30 días). Genera `Conciliacion_Retenciones_Emitidas_*.xlsx` con `Resumen_Mensual`, `Conciliacion`, `Solo_en_SRI`, `Solo_en_Odoo`, `Fecha_distinta`. Uso: `python conciliar_emitidas.py odoo.xlsx retenciones_emitidas salida.xlsx [desde] [hasta]`. **Script CLI independiente que se conserva**; no lo usa la app web. No confundir con `conciliar_emitidos.py` (con **o**), que es la lógica del pipeline web de la pestaña Ventas. |
 | `reten_odoo.xlsx` | Reporte exportado desde Odoo (retenciones de compras del período). Se reemplaza cada vez que se corra el análisis. |
 | `xml_samples/` | Carpeta donde caen los XML descargados (nombrados `<clave_acceso>.xml`). El archivo `Comprobante_de_Reten.xml` es una muestra manual; el glob de parseo usa `[0-9]*.xml` para excluirlo. |
 | `claves_<periodo>.txt` | Lista de claves de acceso del período, generada por el paso 1. |
@@ -175,6 +175,7 @@ El pipeline también corre como app web desplegada en Easypanel (Docker):
 | Archivo | Rol |
 |---|---|
 | `app.py` | FastAPI: `GET /`, `POST /upload` (TXT del SRI + `reten_odoo.xlsx`), `GET /status/{job_id}`, `GET /download/{job_id}`. Auth por cookie de sesión firmada (`SECRET_KEY`, `SESSION_HOURS`). |
+| `app.py` (rutas de pestañas) | `POST /upload` (Retenciones), `POST /upload-compras` (Compras), `POST /upload-ventas` (Ventas); las tres usan `/status/{job_id}` y `/download/{job_id}`. |
 | `pipeline.py` | `run_pipeline(job_id)`: lee TXT → descarga XML (con caché) → `build_workbook` → `conciliar`. Corre en un hilo background. |
 | `job_manager.py` | Crea/lee jobs en `jobs/<job_id>/` (`status.json`, `Recibidos.txt`, `reten_odoo.xlsx`, `resultado.xlsx`, `fallidos.json`). Limpieza automática a las 2 h. |
 | `auth.py`, `setup_usuario.py` | Usuarios en `data/users.yaml` (montado como volumen en Docker). |
@@ -240,3 +241,44 @@ XML (montos y `numDocSustento` solo existen ahí) y usan el caché compartido `c
 - El período de las retenciones se calcula con sus propias fechas (mes dominante) y su propia ventana de lectura en Odoo, independiente de la de compras.
 - Si el TXT de retenciones no tiene ninguna fecha de emisión válida el job termina en `error`.
 - La pestaña "Retenciones" original (TXT + `reten_odoo.xlsx`) sigue disponible.
+
+### Pestaña Ventas (comprobantes emitidos SRI vs Odoo por API)
+
+Concilia lo que la **empresa emite**: facturas (FAC), notas de crédito (NC), notas de débito (ND),
+liquidaciones de compra (LIQ) y retenciones emitidas (RET). Uso semanal: el usuario sube **todos los TXT de
+la semana** del portal SRI (hasta 60, tipos mezclados, con cualquier nombre de archivo) y Odoo 14 se lee
+por XML-RPC en solo lectura (mismas variables `ODOO_*` que Compras). Ya no se sube `reten_odoo.xlsx` ni
+ningún Excel de Odoo.
+
+| Archivo | Rol |
+|---|---|
+| `emitidos_sri.py` | `RUC_EMPRESA`, `TIPOS_DOC`, `leer_emitidos_txts` (devuelve `docs, ret, advertencias`) y `periodo_emitidos`. |
+| `conciliar_emitidos.py` | `clasificar_documentos` (estado por documento FAC/NC/ND/LIQ, reutiliza el motor `conciliar` de Compras) y `conciliar_retenciones_emitidas` (envuelve `conciliar_retenciones`). |
+| `excel_emitidos.py` | `construir_excel_emitidos`: libro con fórmulas; las retenciones reutilizan las hojas `Ret_*` de `excel_retenciones`. |
+| `pipeline_ventas.py` | `run_pipeline_ventas(job_id)`: TXT en `jobs/<id>/emitidos/*.txt` → período → Odoo → XML de retenciones (si hay) → estados → Excel. Hilo background. |
+| `odoo_client.py` | `fetch_emitidos` (documentos) y `fetch_retenciones_emitidas` (`in_retention`); ambos con margen de 5 días y errores sin credenciales. |
+| `xml_cache.py` | `lineas_sri(claves, cache_dir, contraparte=True)`: `proveedor` pasa a ser la razón social del sujeto retenido. |
+
+- Ruta `POST /upload-ventas` (campo `emitidos`, 1 a 60 TXT `.txt`) y pestaña "Ventas" en `templates/`. Los módulos del flujo anterior de Ventas (`conciliar_ventas_sri`, `conciliar_facturas_emitidas`, `odoo_venta.xlsx`, TXT `emitidos_AAAA-MM-DD.txt`) ya no existen.
+- **Tipos**: se detectan por la columna `COMPROBANTE` del TXT, nunca por el nombre del archivo. Las guías de remisión se ignoran con una advertencia (igual que los tipos desconocidos). Claves repetidas se deduplican (se conserva la primera fila; advertencia si los datos difieren).
+- **`RUC_EMPRESA`** (`emitidos_sri.py`, `2390000831001`): en retenciones **emitidas** el `ruc` de SRI (XML) y de Odoo es siempre el de la empresa (es el emisor); el proveedor retenido va en `proveedor` (SRI, razón social del sujeto retenido) / `socio` (Odoo). No lo uses para identificar al proveedor.
+- **Mapeo en Odoo** (`fetch_emitidos`; estados `posted`, `cancel` y `draft`): `out_invoice` con tipo de comprobante 01 → FAC; `out_refund` con 04 → NC; `out_invoice` con 05 → ND; `in_invoice` con `account.receipt.type` de código `03` (ids 3 Liquidación de compra y 15, ambos con ese código) → LIQ. Otros tipos o códigos incoherentes con el `move_type` se descartan. `elegible` = publicado o cancelado. Retenciones: `account.move.retention` con `type = in_retention`, clave desde `auth_retention_number`.
+- **Estados de documento** (FAC/NC/ND/LIQ, un registro por pareja o lado sin pareja):
+
+| Estado | Significado |
+|---|---|
+| **Coincide** | Total y base iguales (±$0.02), misma clave, misma fecha y electrónico en Odoo |
+| **Solo en SRI** | Autorizado en el SRI sin registro en Odoo |
+| **Solo en Odoo** | Publicado, electrónico y sin autorización en el SRI (dentro del período) |
+| **Diferencia de valor** | Total o base distintos |
+| **Diferencia de datos** | Mismos valores pero clave, fecha o marca electrónica distintas |
+| **Odoo anulado, SRI autorizado** | Cancelado en Odoo y autorizado en el SRI (hoja `Anulados_Odoo`) |
+| **Duplicado en Odoo** | Otro registro de Odoo ya cruza con ese documento; un publicado prevalece sobre el cancelado |
+| **Informativo** | Borrador, cancelado sin autorización, no electrónico o duplicado anulado en Odoo |
+
+  Las **retenciones** usan los estados de Compras por documento (`Coincide`, `Solo en SRI`, `Solo en Odoo`, `Diferencia de valor`, `Factura incorrecta en Odoo`, `XML no disponible`, `Informativo (Odoo cancelada/borrador)`) más `Odoo anulado, SRI autorizado` (una retención cancelada en Odoo y autorizada en el SRI).
+- **Período** = min..max de las fechas de emisión de todos los TXT (sin mes dominante); si abarca más de 35 días se agrega una advertencia. Odoo se lee con esa ventana ± 5 días; los registros de Odoo sin pareja fuera de min..max no se listan.
+- **Límite de 30 días del XML**: los XML de retenciones solo se pueden bajar del WS público durante ~30 días; las más antiguas quedan como `XML no disponible` (no `Solo en SRI`) salvo que ya estén en `cache/xml/` (caché compartido, ver arriba).
+- **Solo retenciones**: si la carga no trae documentos (FAC/NC/ND/LIQ) no se leen documentos de Odoo, solo `in_retention`. Si trae retenciones sin ninguna fecha válida, el job termina en `error`; sin ningún documento ni retención también.
+- **Excel**: `Resumen` (una fila por FAC/NC/ND/LIQ, fila RET por documentos, notas y advertencias), `Conciliacion` (una fila por documento), `Solo_en_SRI`, `Solo_en_Odoo`, `Diferencias` (valor y datos), `Anulados_Odoo` y, si hubo retenciones, `Ret_Documentos`, `Ret_Conciliacion`, `Ret_Solo_SRI`, `Ret_Solo_Odoo`, `Ret_Diferencia_Valor`, `Ret_Factura_Incorrecta`, `Ret_Informativos`.
+- **`resumen` del job** (`/status/{job_id}`): `por_tipo` (por FAC/NC/ND/LIQ y RET: `total` y conteo por estado), `comprobantes_sri` (filas del TXT por tipo, incl. `RET`), `periodo` (`[desde, hasta]` ISO), `advertencias`, `retenciones_fallidos` (XML no descargados o ilegibles) y `recalculado` (si LibreOffice recalculó las fórmulas; si no, hay advertencia).
