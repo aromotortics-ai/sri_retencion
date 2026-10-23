@@ -131,20 +131,20 @@ async def upload(
 
 @app.post("/upload-ventas")
 async def upload_ventas(
-    odoo_venta: UploadFile = File(...),
     emitidos: list[UploadFile] = File(...),
     _user: str = Depends(require_session),
 ):
+    if not 1 <= len(emitidos) <= 60:
+        raise HTTPException(status_code=400, detail="Sube entre 1 y 60 archivos TXT del SRI")
+    # basename para evitar path traversal
+    nombres = [Path((f.filename or "").replace("\\", "/")).name for f in emitidos]
+    if any(not n.lower().endswith(".txt") for n in nombres):
+        raise HTTPException(status_code=400, detail="Todos los archivos deben ser .txt")
+
     job_id  = create_job()
     job_dir = get_job_dir(job_id)
     (job_dir / "emitidos").mkdir()
-
-    (job_dir / "odoo_venta.xlsx").write_bytes(await odoo_venta.read())
-    for i, f in enumerate(emitidos):
-        # basename para evitar path traversal; prefijo si hay nombres repetidos
-        nombre = Path(f.filename or f"emitidos_{i}.txt").name
-        if not nombre.startswith("emitidos_"):
-            nombre = f"emitidos_{nombre}"  # el lector solo toma emitidos_*.txt
+    for i, (f, nombre) in enumerate(zip(emitidos, nombres)):
         dest = job_dir / "emitidos" / nombre
         if dest.exists():
             dest = job_dir / "emitidos" / f"{i}_{nombre}"

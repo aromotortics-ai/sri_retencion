@@ -128,7 +128,7 @@ def test_upload_ventas_missing_files(client):
     assert client.post("/upload-ventas", cookies=cookies).status_code == 422
 
 
-def test_upload_ventas_creates_job_with_multiple_txt(client, monkeypatch):
+def test_upload_ventas_acepta_txt_con_nombre_del_portal(client, monkeypatch):
     import app as app_module
     from job_manager import get_job_dir
     monkeypatch.setattr(app_module, "run_pipeline_ventas", lambda job_id: None)
@@ -138,17 +138,54 @@ def test_upload_ventas_creates_job_with_multiple_txt(client, monkeypatch):
         "/upload-ventas",
         cookies=cookies,
         files=[
-            ("odoo_venta", ("odoo.xlsx", b"x", "application/octet-stream")),
-            ("emitidos", ("emitidos_2026-03-01.txt", b"a", "text/plain")),
-            ("emitidos", ("emitidos_2026-03-02.txt", b"b", "text/plain")),
+            ("emitidos", ("2390000831001_EmitidosAutorizados (1).txt", b"a", "text/plain")),
+            ("emitidos", ("2390000831001_EmitidosAutorizados (1).txt", b"b", "text/plain")),
         ],
     )
     assert r.status_code == 200
-    job_id = r.json()["job_id"]
-    d = get_job_dir(job_id)
-    assert (d / "odoo_venta.xlsx").exists()
-    assert sorted(p.name for p in (d / "emitidos").iterdir()) == [
-        "emitidos_2026-03-01.txt", "emitidos_2026-03-02.txt"]
+    d = get_job_dir(r.json()["job_id"]) / "emitidos"
+    nombres = sorted(p.name for p in d.iterdir())
+    assert "2390000831001_EmitidosAutorizados (1).txt" in nombres
+    assert len(nombres) == 2  # el repetido se conserva con prefijo numérico
+
+
+def test_upload_ventas_nombre_con_ruta_no_escapa_del_job(client, monkeypatch):
+    import app as app_module
+    from job_manager import get_job_dir
+    monkeypatch.setattr(app_module, "run_pipeline_ventas", lambda job_id: None)
+    cookies = _login(client)
+    r = client.post("/upload-ventas", cookies=cookies,
+                    files=[("emitidos", ("../../evil.txt", b"x", "text/plain"))])
+    assert r.status_code == 200
+    d = get_job_dir(r.json()["job_id"])
+    assert [p.name for p in (d / "emitidos").iterdir()] == ["evil.txt"]
+
+
+def test_upload_ventas_rechaza_no_txt(client, monkeypatch):
+    import app as app_module
+    monkeypatch.setattr(app_module, "run_pipeline_ventas", lambda job_id: None)
+    cookies = _login(client)
+    r = client.post("/upload-ventas", cookies=cookies,
+                    files=[("emitidos", ("odoo.xlsx", b"x", "application/octet-stream"))])
+    assert r.status_code == 400
+
+
+def test_upload_ventas_rechaza_mas_de_60_archivos(client, monkeypatch):
+    import app as app_module
+    monkeypatch.setattr(app_module, "run_pipeline_ventas", lambda job_id: None)
+    cookies = _login(client)
+    files = [("emitidos", (f"e{i}.txt", b"x", "text/plain")) for i in range(61)]
+    assert client.post("/upload-ventas", cookies=cookies, files=files).status_code == 400
+
+
+def test_upload_ventas_ya_no_pide_excel_de_odoo(client, monkeypatch):
+    import app as app_module
+    monkeypatch.setattr(app_module, "run_pipeline_ventas", lambda job_id: None)
+    cookies = _login(client)
+    r = client.post("/upload-ventas", cookies=cookies,
+                    files=[("emitidos", ("a.txt", b"x", "text/plain"))])
+    assert r.status_code == 200
+    assert "job_id" in r.json()
 
 
 def test_download_ventas_name(client):

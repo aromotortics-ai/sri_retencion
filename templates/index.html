@@ -83,13 +83,9 @@
     </div>
     <div id="form-ventas" style="display:none;">
       <div class="field">
-        <label>1. TXT diarios de comprobantes emitidos (SRI)</label>
+        <label>TXT del portal SRI (comprobantes emitidos)</label>
         <input type="file" id="emitidos-files" accept=".txt" multiple>
-        <p class="file-count" id="emitidos-count">Selecciona todos los <code>emitidos_AAAA-MM-DD.txt</code> del período.</p>
-      </div>
-      <div class="field">
-        <label>2. Facturas de cliente de Odoo (.xlsx)</label>
-        <input type="file" id="odoo-venta-file" accept=".xlsx">
+        <p class="file-count" id="emitidos-count">Sube todos los TXT de emitidos de la semana (facturas, notas de crédito, notas de débito, liquidaciones y retenciones). Odoo se lee automáticamente.</p>
       </div>
     </div>
     <div id="form-compras" style="display:none;">
@@ -169,10 +165,9 @@
       url = "/upload-compras";
     } else if (mode === "ventas") {
       const txts = document.getElementById("emitidos-files").files;
-      const xlsx = document.getElementById("odoo-venta-file").files[0];
-      if (!txts.length || !xlsx) { alert("Selecciona los TXT del SRI y el Excel de Odoo."); return; }
+      if (!txts.length) { alert("Selecciona los TXT del SRI."); return; }
+      if (txts.length > 60) { alert("Máximo 60 archivos."); return; }
       for (const f of txts) fd.append("emitidos", f);
-      fd.append("odoo_venta", xlsx);
       url = "/upload-ventas";
     } else {
       const txt  = document.getElementById("txt-file").files[0];
@@ -229,16 +224,8 @@
     show("result-section");
     const grid = document.getElementById("stat-grid");
     if (mode === "compras") { showResultCompras(job_id, resumen); return; }
-    const rows = mode === "ventas" ? [
-      ["Facturas en SRI",              resumen.n_sri,               ""],
-      ["Facturas en Odoo",             resumen.n_odoo,              ""],
-      ["Coinciden",                    resumen.coinciden,           "ok"],
-      ["Diferencias (valor/clave/fecha)", resumen.diferencias,      resumen.diferencias > 0 ? "warn" : "ok"],
-      ["Solo en SRI · falta en Odoo",  resumen.solo_sri,            resumen.solo_sri > 0 ? "warn" : "ok"],
-      ["Solo en Odoo · revisar",       resumen.solo_odoo,           resumen.solo_odoo > 0 ? "warn" : "ok"],
-      ["Odoo no autorizado",           resumen.odoo_no_autorizado,  resumen.odoo_no_autorizado > 0 ? "warn" : "ok"],
-      ["Duplicados en TXT del SRI",    resumen.duplicados_sri,      resumen.duplicados_sri > 0 ? "warn" : "ok"],
-    ] : [
+    if (mode === "ventas") { showResultVentas(job_id, resumen); return; }
+    const rows = [
       ["Retenciones SRI",           resumen.n_listado,       ""],
       ["XMLs descargados",          resumen.n_xml,           resumen.n_xml === resumen.n_listado ? "ok" : "warn"],
       ["Líneas coinciden",          resumen.coinciden,       "ok"],
@@ -286,6 +273,31 @@
     document.getElementById("btn-download").onclick = () => { window.location = `/download/${job_id}`; };
   }
 
+  function showResultVentas(job_id, resumen) {
+    const nombres = { FAC: "Facturas", NC: "Notas de crédito", ND: "Notas de débito",
+                      LIQ: "Liquidaciones", RET: "Retenciones" };
+    // Estados que no son problema; el resto se marca como aviso si es > 0.
+    const neutros = new Set(["Coincide", "Informativo", "Informativos"]);
+    const [d, h] = resumen.periodo || [];
+    let html = d ? `<span class="stat-note">Período: ${esc(d)} a ${esc(h)}</span>` : "";
+    for (const tipo of ["FAC", "NC", "ND", "LIQ", "RET"]) {
+      const c = (resumen.por_tipo || {})[tipo];
+      const n = (resumen.comprobantes_sri || {})[tipo] ?? 0;
+      if (!c && !n) continue;
+      html += `<span class="stat-sub">${nombres[tipo]} (${esc(n)} en SRI)</span>`;
+      html += Object.entries(c || {}).filter(([k]) => k !== "total").map(([k, v]) =>
+        `<span class="stat-label">${esc(k)}</span>` +
+        `<span class="stat-value ${k === "Coincide" ? "ok" : (neutros.has(k) ? "" : (v > 0 ? "warn" : "ok"))}">${esc(v)}</span>`
+      ).join("");
+    }
+    if (resumen.retenciones_fallidos > 0) {
+      html += `<span class="stat-note">&#x26A0; ${esc(resumen.retenciones_fallidos)} retenciones sin XML disponible</span>`;
+    }
+    html += (resumen.advertencias || []).map(a => `<span class="stat-note">&#x26A0; ${esc(a)}</span>`).join("");
+    document.getElementById("stat-grid").innerHTML = html;
+    document.getElementById("btn-download").onclick = () => { window.location = `/download/${job_id}`; };
+  }
+
   function showError(msg) {
     show("error-section");
     document.getElementById("error-msg").textContent = msg;
@@ -298,9 +310,8 @@
     document.getElementById("xlsx-file").value = "";
     document.getElementById("emitidos-files").value = "";
     document.getElementById("compras-files").value = "";
-    document.getElementById("odoo-venta-file").value = "";
     document.getElementById("emitidos-count").textContent =
-      "Selecciona todos los emitidos_AAAA-MM-DD.txt del período.";
+      "Sube todos los TXT de emitidos de la semana (facturas, notas de crédito, notas de débito, liquidaciones y retenciones). Odoo se lee automáticamente.";
     document.getElementById("btn-procesar").disabled = false;
     document.getElementById("bar-fill").style.width = "0%";
     show("form-section");
