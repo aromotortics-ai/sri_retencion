@@ -38,6 +38,30 @@ def periodo_sri(sri) -> tuple[date, date, date, date]:
             min(desde, f.min().date()), max(hasta, f.max().date()))
 
 
+def descargar_con_progreso(claves, descargar, cache_dir, avisar):
+    """Descarga los XML de `claves` con `descargar` (firma de xml_cache.descargar_xmls) informando el
+    avance entre 0,15 y 0,65 con avisar(mensaje, progreso). Devuelve los fallidos.
+
+    La función de descarga, el caché y el aviso se reciben como argumentos para que cada pipeline
+    use (y los tests sustituyan) los suyos."""
+    total = len(claves)
+    avance = {"hecho": False}
+
+    def mensaje(n, k):
+        return f"Descargando XML de retenciones ({n}/{total}, {k} fallidos)"
+
+    def on_progress(n, tot, k):
+        avance["hecho"] = True
+        fr = n / tot if tot else 1.0
+        avisar(mensaje(n, k), _DESCARGA_INI + (_DESCARGA_FIN - _DESCARGA_INI) * fr)
+
+    avisar(mensaje(0, 0), _DESCARGA_INI)
+    fallidos = descargar(claves, cache_dir, on_progress=on_progress)
+    if not avance["hecho"]:  # todo estaba en caché: on_progress nunca se llamó
+        avisar(mensaje(total, len(fallidos)), _DESCARGA_FIN)
+    return fallidos
+
+
 def _retenciones(job_id, sri_ret, lector):
     """Lee Odoo, descarga XML y concilia retenciones. Devuelve (ret, desde, hasta, n_sin_xml)."""
     con_fecha = sri_ret[sri_ret["fecha"].notna()]
@@ -50,22 +74,8 @@ def _retenciones(job_id, sri_ret, lector):
     odoo_ret = lector.fetch_retenciones(fetch_desde, fetch_hasta)
 
     claves = list(sri_ret["clave"])
-    total = len(claves)
-    avance = {"hecho": False}
-
-    def mensaje(n, k):
-        return f"Descargando XML de retenciones ({n}/{total}, {k} fallidos)"
-
-    def on_progress(n, tot, k):
-        avance["hecho"] = True
-        fr = n / tot if tot else 1.0
-        write_status(job_id, "running", mensaje(n, k),
-                     _DESCARGA_INI + (_DESCARGA_FIN - _DESCARGA_INI) * fr)
-
-    write_status(job_id, "running", mensaje(0, 0), _DESCARGA_INI)
-    fallidos = descargar_xmls(claves, CACHE_XML_DIR, on_progress=on_progress)
-    if not avance["hecho"]:  # todo estaba en caché: on_progress nunca se llamó
-        write_status(job_id, "running", mensaje(total, len(fallidos)), _DESCARGA_FIN)
+    descargar_con_progreso(claves, descargar_xmls, CACHE_XML_DIR,
+                           lambda m, p: write_status(job_id, "running", m, p))
 
     lineas = lineas_sri(claves, CACHE_XML_DIR)
     # Sin líneas = no descargado o XML ilegible/vacío: todos terminan como "XML no disponible".
