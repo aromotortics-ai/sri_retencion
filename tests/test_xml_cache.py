@@ -142,3 +142,13 @@ def test_descargar_xmls_progreso(tmp_path):
                    sesion=ses, pausa_seg=0)
     assert eventos[0] == (10, 12, 0)
     assert eventos[-1] == (12, 12, 0)
+
+
+def test_lineas_sri_contraparte(tmp_path):
+    _escribir(tmp_path, CLAVE_V2, "2.0.0")
+    normal = lineas_sri([CLAVE_V2], tmp_path)
+    assert normal["proveedor"].iloc[0] == "PROVEEDOR SA"
+    cp = lineas_sri([CLAVE_V2], tmp_path, contraparte=True)
+    assert cp["proveedor"].iloc[0] == "EMPRESA"
+    assert cp["ruc"].iloc[0] == "1790000000001"
+    assert list(cp.columns) == list(normal.columns)

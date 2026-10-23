@@ -11,6 +11,8 @@ from datetime import date, timedelta
 
 import pandas as pd
 
+from emitidos_sri import RUC_EMPRESA
+
 RUTA_ENV = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
 VARIABLES = ("ODOO_URL", "ODOO_DB", "ODOO_USER", "ODOO_PASSWORD")
 PAGINA = 500
@@ -276,16 +278,29 @@ class OdooReader:
         except Exception:
             raise OdooError("No se pudo consultar Odoo (error de conexión o de la consulta)") from None
 
-    def _fetch_retenciones(self, desde, hasta, margen_dias):
+    def fetch_retenciones_emitidas(self, desde: date, hasta: date, margen_dias: int = 5) -> pd.DataFrame:
+        """Retenciones EMITIDAS (in_retention), todos los estados; una fila por linea.
+
+        `ruc` es siempre RUC_EMPRESA (la empresa es la emisora) y `socio` el proveedor retenido."""
+        try:
+            return self._fetch_retenciones(desde, hasta, margen_dias, "in_retention", emitidas=True)
+        except OdooError:
+            raise
+        except Exception:
+            raise OdooError("No se pudo consultar Odoo (error de conexión o de la consulta)") from None
+
+    def _fetch_retenciones(self, desde, hasta, margen_dias, tipo="out_retention", emitidas=False):
+        columnas = COLUMNAS_RET + ["clave"] if emitidas else COLUMNAS_RET
         self._conectar()
-        dominio = [("type", "=", "out_retention"),
+        dominio = [("type", "=", tipo),
                    ("retention_date", ">=", (desde - timedelta(days=margen_dias)).isoformat()),
                    ("retention_date", "<=", (hasta + timedelta(days=margen_dias)).isoformat())]
-        rets = self._search_read_todo(
-            "account.move.retention", dominio,
-            ["retention_number", "retention_date", "state", "partner_id", "invoice_id", "type"])
+        campos = ["retention_number", "retention_date", "state", "partner_id", "invoice_id", "type"]
+        if emitidas:
+            campos.append("auth_retention_number")
+        rets = self._search_read_todo("account.move.retention", dominio, campos)
         if not rets:
-            return pd.DataFrame(columns=COLUMNAS_RET)
+            return pd.DataFrame(columns=columnas)
 
         ids = [r["id"] for r in rets]
         lineas = []
@@ -313,17 +328,20 @@ class OdooReader:
             fid = r["invoice_id"][0] if r["invoice_id"] else None
             nombre_tax = ln["tax_id"][1] if ln["tax_id"] else ""
             cod = _txt(nombre_tax.split(" - ", 1)[0]) if " - " in nombre_tax else pd.NA
-            filas.append({
+            fila = {
                 "id_ret": r["id"],
                 "n_ret": _txt(r["retention_number"]),
                 "fecha": pd.Timestamp(r["retention_date"]) if r["retention_date"] else pd.NaT,
                 "estado": r["state"],
                 "socio": r["partner_id"][1] if r["partner_id"] else "",
-                "ruc": _txt(vat.get(pid)),
+                "ruc": RUC_EMPRESA if emitidas else _txt(vat.get(pid)),
                 "factura": facturas.get(fid, pd.NA),
                 "pct": float(ln["tax_percent"] or 0),
                 "base": float(ln["amount_untaxed"] or 0),
                 "valor": float(ln["amount_retention"] or 0),
                 "cod": cod,
-            })
-        return pd.DataFrame(filas, columns=COLUMNAS_RET)
+            }
+            if emitidas:
+                fila["clave"] = _clave(r.get("auth_retention_number"))
+            filas.append(fila)
+        return pd.DataFrame(filas, columns=columnas)

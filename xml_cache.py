@@ -88,8 +88,11 @@ def descargar_xmls(claves, cache_dir, on_progress=None, sesion=None, pausa_seg=0
     return fallidos
 
 
-def lineas_sri(claves, cache_dir):
-    """Una fila por línea de retención, solo de las claves dadas presentes en el caché."""
+def lineas_sri(claves, cache_dir, contraparte: bool = False):
+    """Una fila por línea de retención, solo de las claves dadas presentes en el caché.
+
+    Con contraparte=True `proveedor` es la razón social del sujeto retenido (retenciones
+    emitidas: el emisor es la empresa); `ruc` sigue siendo el del emisor."""
     cache_dir = Path(cache_dir)
     filas = []
     for clave in dict.fromkeys(claves):
@@ -106,7 +109,8 @@ def lineas_sri(claves, cache_dir):
                 "n_ret": f"{d['Establecimiento']}-{d['Punto_Emision']}-{d['Secuencial']}",
                 "fecha": pd.to_datetime(d["Fecha_Emision"], format="%d/%m/%Y", errors="coerce"),
                 "ruc": d["RUC_Emisor"],
-                "proveedor": d["Razon_Social_Emisor"],
+                "proveedor": (d.get("Razon_Social_Sujeto_Retenido", cab.get("Razon_Social_Sujeto_Retenido", ""))
+                              if contraparte else d["Razon_Social_Emisor"]),
                 "factura": formatear_doc(d["Num_Doc_Sustento"]),
                 "cod": d["Codigo_Retencion"],
                 "pct": d["Porcentaje_Retener"],

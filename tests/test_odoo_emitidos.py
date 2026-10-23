@@ -3,7 +3,7 @@ from datetime import date
 import pandas as pd
 import pytest
 
-from odoo_client import COLUMNAS_EMITIDOS, OdooError, OdooReader
+from odoo_client import COLUMNAS_EMITIDOS, COLUMNAS_RET, OdooError, OdooReader
 
 CLAVE49 = "3009202601239000083100120010050001507450015074515"
 TIPOS_REC = [{"id": 1, "code": "01"}, {"id": 4, "code": "04"}, {"id": 5, "code": "05"},
@@ -126,3 +126,60 @@ def test_fetch_emitidos_vacio():
     df, _ = fetch([])
     assert df.empty
     assert list(df.columns) == COLUMNAS_EMITIDOS
+
+
+class FakeProxyRet:
+    """Proxy de solo lectura para account.move.retention."""
+
+    def __init__(self, tipo):
+        self.tipo = tipo
+        self.llamadas = []
+
+    def authenticate(self, db, user, pwd, ctx):
+        return 9
+
+    def execute_kw(self, db, uid, pwd, model, method, args, kw=None):
+        self.llamadas.append((model, method, args, kw))
+        assert method in {"search_read", "read", "search_count", "fields_get"}
+        if model == "account.move.retention" and method == "search_read":
+            return [{"id": 10, "retention_number": "001-002-000033634", "retention_date": "2026-09-10",
+                     "state": "posted", "partner_id": [7, "Proveedor SA"], "invoice_id": [20, "BILL/1"],
+                     "type": self.tipo, "auth_retention_number": CLAVE49}]
+        if model == "account.move.retention.line":
+            return [{"retention_id": [10, "x"], "amount_untaxed": 100.0, "amount_retention": 1.75,
+                     "tax_percent": 1.75, "tax_id": [1, "312 - Compras"]}]
+        if model == "res.partner":
+            return [{"id": 7, "vat": "1790000000001"}]
+        if model == "account.move":
+            return [{"id": 20, "name": "BILL/1", "x_number": "001-003-000088766"}]
+        return []
+
+
+def _lector_ret(tipo):
+    proxy = FakeProxyRet(tipo)
+    return OdooReader("http://odoo.local", "db", "u", "secreto123",
+                      proxy_factory=lambda url, **k: proxy), proxy
+
+
+def _dominio_ret(proxy):
+    return next(a[0] for m, me, a, k in proxy.llamadas
+                if m == "account.move.retention" and me == "search_read")
+
+
+def test_fetch_retenciones_emitidas_usa_in_retention():
+    from emitidos_sri import RUC_EMPRESA
+    lector, proxy = _lector_ret("in_retention")
+    df = lector.fetch_retenciones_emitidas(date(2026, 9, 1), date(2026, 9, 30))
+    assert ("type", "=", "in_retention") in _dominio_ret(proxy)
+    assert list(df.columns) == COLUMNAS_RET + ["clave"]
+    assert df["ruc"].iloc[0] == RUC_EMPRESA == "2390000831001"
+    assert df["socio"].iloc[0] == "Proveedor SA"
+    assert df["clave"].iloc[0] == CLAVE49
+
+
+def test_fetch_retenciones_recibidas_sin_cambios():
+    lector, proxy = _lector_ret("out_retention")
+    df = lector.fetch_retenciones(date(2026, 9, 1), date(2026, 9, 30))
+    assert ("type", "=", "out_retention") in _dominio_ret(proxy)
+    assert list(df.columns) == COLUMNAS_RET
+    assert df["ruc"].iloc[0] == "1790000000001"
