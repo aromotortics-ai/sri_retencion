@@ -110,6 +110,18 @@ def test_fetch_emitidos_error_sin_credenciales():
     assert "secreto123" not in str(e.value) and "odoo.local" not in str(e.value)
 
 
+def test_fetch_emitidos_codigo_incoherente_con_tipo_de_asiento():
+    moves = [
+        mov(id=1, move_type="out_refund", x_receipt_type_id=[1, "Factura"]),  # FAC en refund
+        mov(id=2, move_type="out_invoice", x_receipt_type_id=[4, "NC"]),      # NC en invoice
+        mov(id=3, move_type="out_refund", x_receipt_type_id=[5, "ND"]),       # ND en refund
+        mov(id=4, move_type="out_invoice", x_receipt_type_id=[2, "Otro"]),    # codigo desconocido
+        mov(id=5),
+    ]
+    df, _ = fetch(moves)
+    assert list(df["id"]) == [5]
+
+
 def test_fetch_emitidos_vacio():
     df, _ = fetch([])
     assert df.empty

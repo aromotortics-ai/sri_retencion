@@ -24,9 +24,8 @@ COLUMNAS_RET = ["id_ret", "n_ret", "fecha", "estado", "socio", "ruc", "factura",
                 "base", "valor", "cod"]
 COLUMNAS_EMITIDOS = ["id", "num", "nfac", "socio", "ruc", "fecha", "tipo", "clave", "base",
                      "iva", "total", "afectada", "estado", "electronico", "elegible"]
-# Codigo de account.receipt.type -> tipo de documento emitido (ventas). Verificado en
-# solo lectura: los ids 3 (Liquidacion de compra) y 15 (Comprobante por reembolso) tienen code "03".
-TIPOS_EMITIDOS = {"01": "FAC", "04": "NC", "05": "ND"}
+# Verificado en solo lectura: los ids 3 (Liquidacion de compra) y 15 (Comprobante por
+# reembolso) de account.receipt.type tienen code "03". El mapa codigo->tipo es TIPOS.
 CODIGOS_LIQUIDACION = ("03",)
 _NUM_DOC = re.compile(r"\d{3}-\d{3}-\d{9}")
 
@@ -95,6 +94,28 @@ def _clave(v):
     return t.zfill(49)
 
 
+def _fila_base(m, vat):
+    """Campos comunes de una fila (compras y emitidos); importes en valor absoluto."""
+    pid = m["partner_id"][0] if m["partner_id"] else None
+    return {
+        "id": m["id"],
+        "num": m["name"],
+        "nfac": _txt(m["x_number"]),
+        "socio": m["partner_id"][1] if m["partner_id"] else "",
+        "ruc": _txt(vat.get(pid)),
+        "fecha": pd.Timestamp(m["invoice_date"]) if m["invoice_date"] else pd.NaT,
+        "base": abs(float(m["amount_untaxed"])),
+        "iva": abs(float(m["amount_tax"])),
+        "total": abs(float(m["amount_total"])),
+    }
+
+
+def _afectada(m, tipo, rev):
+    """x_number del documento afectado (solo notas de credito)."""
+    rev_id = m["reversed_entry_id"][0] if m["reversed_entry_id"] else None
+    return _txt(rev.get(rev_id)) if tipo == "NC" and rev_id else pd.NA
+
+
 class OdooReader:
     def __init__(self, url, db, user, password, proxy_factory=_proxy_con_timeout):
         self._url = url.rstrip("/")
@@ -136,6 +157,24 @@ class OdooReader:
                 return filas
             off += PAGINA
 
+    def _mapa_codigos(self):
+        """id de account.receipt.type -> code."""
+        return {t["id"]: t["code"] for t in
+                self._call("account.receipt.type", "search_read", [[]], fields=["code"])}
+
+    def _mapa_vat(self, moves):
+        """id de partner -> vat, para los socios de los asientos dados."""
+        pids = sorted({m["partner_id"][0] for m in moves if m["partner_id"]})
+        return ({p["id"]: p["vat"] for p in self._call("res.partner", "read", [pids], fields=["vat"])}
+                if pids else {})
+
+    def _mapa_afectadas(self, moves):
+        """id de asiento revertido -> x_number, para los asientos dados."""
+        rids = sorted({m["reversed_entry_id"][0] for m in moves if m["reversed_entry_id"]})
+        return ({r["id"]: r["x_number"] for r in
+                 self._call("account.move", "search_read", [[("id", "in", rids)]],
+                            fields=["x_number"])} if rids else {})
+
     def fetch_compras(self, desde: date, hasta: date, margen_dias: int = 5) -> pd.DataFrame:
         try:
             return self._fetch_compras(desde, hasta, margen_dias)
@@ -155,40 +194,24 @@ class OdooReader:
         if not moves:
             return pd.DataFrame(columns=COLUMNAS)
 
-        tipos = {t["id"]: t["code"] for t in
-                 self._call("account.receipt.type", "search_read", [[]], fields=["code"])}
-        pids = sorted({m["partner_id"][0] for m in moves if m["partner_id"]})
-        vat = {p["id"]: p["vat"] for p in self._call("res.partner", "read", [pids], fields=["vat"])} if pids else {}
-        rids = sorted({m["reversed_entry_id"][0] for m in moves if m["reversed_entry_id"]})
-        rev = ({r["id"]: r["x_number"] for r in
-                self._call("account.move", "search_read", [[("id", "in", rids)]],
-                           fields=["x_number"])} if rids else {})
+        codigos = self._mapa_codigos()
+        vat = self._mapa_vat(moves)
+        rev = self._mapa_afectadas(moves)
 
         filas = []
         for m in moves:
-            cod = tipos.get(m["x_receipt_type_id"][0] if m["x_receipt_type_id"] else None, "")
+            cod = codigos.get(m["x_receipt_type_id"][0] if m["x_receipt_type_id"] else None, "")
             tipo = TIPOS.get(cod, "OTRO")
             clave = _clave(m["x_authorization_number"])
-            propio = bool(m["x_is_edocument"])
-            nfac = _txt(m["x_number"])
-            pid = m["partner_id"][0] if m["partner_id"] else None
-            rev_id = m["reversed_entry_id"][0] if m["reversed_entry_id"] else None
-            filas.append({
-                "id": m["id"],
-                "num": m["name"],
-                "nfac": nfac,
-                "socio": m["partner_id"][1] if m["partner_id"] else "",
-                "ruc": _txt(vat.get(pid)),
-                "fecha": pd.Timestamp(m["invoice_date"]) if m["invoice_date"] else pd.NaT,
+            fila = _fila_base(m, vat)
+            fila.update({
                 "tipo": tipo,
                 "cod_comp": cod,
                 "clave": clave,
-                "base": abs(float(m["amount_untaxed"])),
-                "iva": abs(float(m["amount_tax"])),
-                "total": abs(float(m["amount_total"])),
-                "afectada": _txt(rev.get(rev_id)) if tipo == "NC" and rev_id else pd.NA,
-                "elegible": cod in TIPOS and clave is not pd.NA and not propio,
+                "afectada": _afectada(m, tipo, rev),
+                "elegible": cod in TIPOS and clave is not pd.NA and not bool(m["x_is_edocument"]),
             })
+            filas.append(fila)
         return pd.DataFrame(filas, columns=COLUMNAS)
 
     def fetch_emitidos(self, desde: date, hasta: date, margen_dias: int = 5) -> pd.DataFrame:
@@ -210,48 +233,38 @@ class OdooReader:
         if not moves:
             return pd.DataFrame(columns=COLUMNAS_EMITIDOS)
 
-        codigos = {t["id"]: t["code"] for t in
-                   self._call("account.receipt.type", "search_read", [[]], fields=["code"])}
+        codigos = self._mapa_codigos()
 
         def tipo_de(m):
             cod = codigos.get(m["x_receipt_type_id"][0] if m["x_receipt_type_id"] else None, "")
-            if m["move_type"] == "in_invoice":  # compras: solo las liquidaciones se emiten
+            mt = m["move_type"]
+            if mt == "in_invoice":  # compras: solo las liquidaciones se emiten
                 return "LIQ" if cod in CODIGOS_LIQUIDACION else None
-            return TIPOS_EMITIDOS.get(cod)
+            tipo = TIPOS.get(cod)
+            # el codigo debe ser coherente con el tipo de asiento
+            if (tipo == "NC") == (mt == "out_refund") and mt in ("out_invoice", "out_refund"):
+                return tipo
+            return None
 
         moves = [(m, t) for m in moves if (t := tipo_de(m))]
         if not moves:
             return pd.DataFrame(columns=COLUMNAS_EMITIDOS)
 
-        pids = sorted({m["partner_id"][0] for m, _ in moves if m["partner_id"]})
-        vat = {p["id"]: p["vat"] for p in self._call("res.partner", "read", [pids], fields=["vat"])} if pids else {}
-        rids = sorted({m["reversed_entry_id"][0] for m, t in moves
-                       if t == "NC" and m["reversed_entry_id"]})
-        rev = ({r["id"]: r["x_number"] for r in
-                self._call("account.move", "search_read", [[("id", "in", rids)]],
-                           fields=["x_number"])} if rids else {})
+        vat = self._mapa_vat([m for m, _ in moves])
+        rev = self._mapa_afectadas([m for m, t in moves if t == "NC"])
 
         filas = []
         for m, tipo in moves:
-            pid = m["partner_id"][0] if m["partner_id"] else None
-            rev_id = m["reversed_entry_id"][0] if m["reversed_entry_id"] else None
-            filas.append({
-                "id": m["id"],
-                "num": m["name"],
-                "nfac": _txt(m["x_number"]),
-                "socio": m["partner_id"][1] if m["partner_id"] else "",
-                "ruc": _txt(vat.get(pid)),
-                "fecha": pd.Timestamp(m["invoice_date"]) if m["invoice_date"] else pd.NaT,
+            fila = _fila_base(m, vat)
+            fila.update({
                 "tipo": tipo,
                 "clave": _clave(m["x_authorization_number"]),
-                "base": abs(float(m["amount_untaxed"])),
-                "iva": abs(float(m["amount_tax"])),
-                "total": abs(float(m["amount_total"])),
-                "afectada": _txt(rev.get(rev_id)) if tipo == "NC" and rev_id else pd.NA,
+                "afectada": _afectada(m, tipo, rev),
                 "estado": m["state"],
                 "electronico": bool(m["x_is_edocument"]),
                 "elegible": m["state"] in ("posted", "cancel"),
             })
+            filas.append(fila)
         return pd.DataFrame(filas, columns=COLUMNAS_EMITIDOS)
 
     def fetch_retenciones(self, desde: date, hasta: date, margen_dias: int = 5) -> pd.DataFrame:
