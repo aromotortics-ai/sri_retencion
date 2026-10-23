@@ -1,6 +1,8 @@
 """
 Aplicación FastAPI para el pipeline de conciliación SRI.
-Endpoints: GET /, POST /upload, GET /status/{job_id}, GET /download/{job_id}
+Endpoints: GET/POST /login, GET /logout, GET /, POST /upload (retenciones recibidas con
+reten_odoo.xlsx), POST /upload-ventas (emitidos), POST /upload-compras (recibidos),
+GET /status/{job_id}, GET /download/{job_id}
 Auth: cookie de sesión firmada con itsdangerous (SESSION_HOURS, default 8 h)
 """
 import os
@@ -47,6 +49,26 @@ def _verify_token(token: str) -> str | None:
 def _current_user(request: Request) -> str | None:
     token = request.cookies.get(COOKIE_NAME)
     return _verify_token(token) if token else None
+
+
+def _nombres_txt(archivos: list[UploadFile]) -> list[str]:
+    """Basename de cada archivo (evita path traversal); 400 si alguno no es .txt."""
+    nombres = [Path((f.filename or "").replace("\\", "/")).name for f in archivos]
+    if any(not n.lower().endswith(".txt") for n in nombres):
+        raise HTTPException(status_code=400, detail="Todos los archivos deben ser .txt")
+    return nombres
+
+
+async def _guardar_txts(archivos: list[UploadFile], nombres: list[str], carpeta: Path) -> None:
+    """Guarda los TXT con la extensión normalizada a `.txt` minúscula (los pipelines usan
+    glob("*.txt"), sensible a mayúsculas en Linux); un nombre repetido lleva prefijo numérico."""
+    carpeta.mkdir()
+    for i, (f, nombre) in enumerate(zip(archivos, nombres)):
+        nombre = Path(nombre).stem + ".txt"
+        dest = carpeta / nombre
+        if dest.exists():
+            dest = carpeta / f"{i}_{nombre}"
+        dest.write_bytes(await f.read())
 
 
 def require_session(request: Request) -> str:
@@ -136,19 +158,10 @@ async def upload_ventas(
 ):
     if not 1 <= len(emitidos) <= 60:
         raise HTTPException(status_code=400, detail="Sube entre 1 y 60 archivos TXT del SRI")
-    # basename para evitar path traversal
-    nombres = [Path((f.filename or "").replace("\\", "/")).name for f in emitidos]
-    if any(not n.lower().endswith(".txt") for n in nombres):
-        raise HTTPException(status_code=400, detail="Todos los archivos deben ser .txt")
+    nombres = _nombres_txt(emitidos)
 
-    job_id  = create_job()
-    job_dir = get_job_dir(job_id)
-    (job_dir / "emitidos").mkdir()
-    for i, (f, nombre) in enumerate(zip(emitidos, nombres)):
-        dest = job_dir / "emitidos" / nombre
-        if dest.exists():
-            dest = job_dir / "emitidos" / f"{i}_{nombre}"
-        dest.write_bytes(await f.read())
+    job_id = create_job()
+    await _guardar_txts(emitidos, nombres, get_job_dir(job_id) / "emitidos")
 
     threading.Thread(target=run_pipeline_ventas, args=(job_id,), daemon=True).start()
     return {"job_id": job_id}
@@ -161,18 +174,10 @@ async def upload_compras(
 ):
     if not 1 <= len(sri) <= 5:
         raise HTTPException(status_code=400, detail="Sube entre 1 y 5 archivos TXT del SRI")
-    nombres = [Path((f.filename or "").replace("\\", "/")).name for f in sri]
-    if any(not n.lower().endswith(".txt") for n in nombres):
-        raise HTTPException(status_code=400, detail="Todos los archivos deben ser .txt")
+    nombres = _nombres_txt(sri)
 
-    job_id  = create_job()
-    job_dir = get_job_dir(job_id)
-    (job_dir / "sri").mkdir()
-    for i, (f, nombre) in enumerate(zip(sri, nombres)):
-        dest = job_dir / "sri" / nombre
-        if dest.exists():
-            dest = job_dir / "sri" / f"{i}_{nombre}"
-        dest.write_bytes(await f.read())
+    job_id = create_job()
+    await _guardar_txts(sri, nombres, get_job_dir(job_id) / "sri")
 
     threading.Thread(target=run_pipeline_compras, args=(job_id,), daemon=True).start()
     return {"job_id": job_id}

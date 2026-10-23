@@ -131,8 +131,9 @@ def test_fetch_emitidos_vacio():
 class FakeProxyRet:
     """Proxy de solo lectura para account.move.retention."""
 
-    def __init__(self, tipo):
+    def __init__(self, tipo, rets=None):
         self.tipo = tipo
+        self.rets = rets  # lista de dicts que sobrescriben la retencion por defecto (ids 10, 11, ...)
         self.llamadas = []
 
     def authenticate(self, db, user, pwd, ctx):
@@ -142,12 +143,15 @@ class FakeProxyRet:
         self.llamadas.append((model, method, args, kw))
         assert method in {"search_read", "read", "search_count", "fields_get"}
         if model == "account.move.retention" and method == "search_read":
-            return [{"id": 10, "retention_number": "001-002-000033634", "retention_date": "2026-09-10",
-                     "state": "posted", "partner_id": [7, "Proveedor SA"], "invoice_id": [20, "BILL/1"],
-                     "type": self.tipo, "auth_retention_number": CLAVE49}]
+            base = {"id": 10, "retention_number": "001-002-000033634", "retention_date": "2026-09-10",
+                    "state": "posted", "partner_id": [7, "Proveedor SA"], "invoice_id": [20, "BILL/1"],
+                    "type": self.tipo, "auth_retention_number": CLAVE49,
+                    "edocument_state": "authorized"}
+            return [dict(base, id=10 + i, **o) for i, o in enumerate(self.rets or [{}])]
         if model == "account.move.retention.line":
-            return [{"retention_id": [10, "x"], "amount_untaxed": 100.0, "amount_retention": 1.75,
-                     "tax_percent": 1.75, "tax_id": [1, "312 - Compras"]}]
+            return [{"retention_id": [10 + i, "x"], "amount_untaxed": 100.0, "amount_retention": 1.75,
+                     "tax_percent": 1.75, "tax_id": [1, "312 - Compras"]}
+                    for i in range(len(self.rets or [{}]))]
         if model == "res.partner":
             return [{"id": 7, "vat": "1790000000001"}]
         if model == "account.move":
@@ -155,8 +159,8 @@ class FakeProxyRet:
         return []
 
 
-def _lector_ret(tipo):
-    proxy = FakeProxyRet(tipo)
+def _lector_ret(tipo, rets=None):
+    proxy = FakeProxyRet(tipo, rets)
     return OdooReader("http://odoo.local", "db", "u", "secreto123",
                       proxy_factory=lambda url, **k: proxy), proxy
 
@@ -183,3 +187,28 @@ def test_fetch_retenciones_recibidas_sin_cambios():
     assert ("type", "=", "out_retention") in _dominio_ret(proxy)
     assert list(df.columns) == COLUMNAS_RET
     assert df["ruc"].iloc[0] == "1790000000001"
+
+
+def _campos_ret(proxy):
+    return next(k["fields"] for m, me, a, k in proxy.llamadas
+                if m == "account.move.retention" and me == "search_read")
+
+
+def test_fetch_retenciones_emitidas_estado_segun_edocument_state():
+    lector, proxy = _lector_ret("in_retention", [
+        {"state": "posted", "edocument_state": "authorized"},
+        {"state": "posted", "edocument_state": "no_authorized"},
+        {"state": "posted", "edocument_state": False},
+        {"state": "cancel", "edocument_state": "no_authorized"},
+        {"state": "draft", "edocument_state": False},
+    ])
+    df = lector.fetch_retenciones_emitidas(date(2026, 9, 1), date(2026, 9, 30))
+    assert "edocument_state" in _campos_ret(proxy)
+    assert list(df["estado"]) == ["posted", "no_autorizada", "no_autorizada", "cancel", "draft"]
+
+
+def test_fetch_retenciones_recibidas_ignoran_edocument_state():
+    lector, proxy = _lector_ret("out_retention", [{"state": "posted", "edocument_state": False}])
+    df = lector.fetch_retenciones(date(2026, 9, 1), date(2026, 9, 30))
+    assert "edocument_state" not in _campos_ret(proxy)
+    assert list(df["estado"]) == ["posted"]

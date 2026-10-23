@@ -248,3 +248,14 @@ def test_retencion_sin_xml():
                                          _txt((CLAVE, N_RET)), DESDE, HASTA)
     assert list(out["estado"]) == [EST_XML]
     assert EST_SOLO_SRI not in set(out["estado"])
+
+
+def test_retencion_publicada_no_autorizada_es_informativa():
+    # odoo_client marca "no_autorizada" la retención publicada cuyo edocument_state no es authorized
+    out = conciliar_retenciones_emitidas(_rsri().iloc[0:0], _rodoo({"estado": "no_autorizada"}),
+                                         _txt(), DESDE, HASTA)
+    assert list(out["estado"]) == [conciliar_retenciones.EST_INFO]
+    assert conciliar_retenciones.EST_SOLO_ODOO not in set(out["estado"])
+    # contraste: la misma retención publicada y autorizada sí es "Solo en Odoo"
+    out = conciliar_retenciones_emitidas(_rsri().iloc[0:0], _rodoo({}), _txt(), DESDE, HASTA)
+    assert list(out["estado"]) == [conciliar_retenciones.EST_SOLO_ODOO]

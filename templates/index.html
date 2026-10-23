@@ -277,7 +277,7 @@
     const nombres = { FAC: "Facturas", NC: "Notas de crédito", ND: "Notas de débito",
                       LIQ: "Liquidaciones", RET: "Retenciones" };
     // Estados que no son problema; el resto se marca como aviso si es > 0.
-    const neutros = new Set(["Coincide", "Informativo", "Informativos"]);
+    const neutros = new Set(["Coincide", "Informativo", "Informativos", "Informativo (Odoo cancelada/borrador)"]);
     const [d, h] = resumen.periodo || [];
     let html = d ? `<span class="stat-note">Período: ${esc(d)} a ${esc(h)}</span>` : "";
     for (const tipo of ["FAC", "NC", "ND", "LIQ", "RET"]) {

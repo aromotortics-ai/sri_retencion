@@ -261,6 +261,37 @@ def test_pipeline_solo_retenciones_no_lee_documentos_de_odoo(tmp_path, monkeypat
     assert s["resumen"]["por_tipo"]["FAC"]["total"] == 0
 
 
+ADV_FALTA_FAC = ("Falta el TXT de facturas: los 1 registros de Odoo de ese tipo aparecerán como "
+                 "'Solo en Odoo'")
+
+
+def test_pipeline_advierte_tipo_sin_txt_con_registros_en_odoo(tmp_path, monkeypatch):
+    fuera = dict(_doc_odoo(3, "LIQ", "001-003-000000009", _clave(309)), fecha=pd.Timestamp("2026-09-30"))
+    borrador = dict(_doc_odoo(4, "ND", "001-005-000000009", _clave(409)), estado="draft", elegible=False)
+    lector = _Odoo(docs=[_doc_odoo(1, "FAC", "001-001-000000001", _clave(101)),
+                         _doc_odoo(2, "NC", "001-002-000000001", _clave(201), total=11.5, base=10.0),
+                         fuera, borrador])
+    pv, job_id, _, _, _ = _entorno(tmp_path, monkeypatch, {"nc.txt": [_nc(1)]}, lector=lector)
+    pv.run_pipeline_ventas(job_id)
+    s = read_status(job_id)
+    assert s["estado"] == "done", s
+    adv = s["resumen"]["advertencias"]
+    assert ADV_FALTA_FAC in adv
+    assert not any(a.startswith("Falta el TXT de notas de crédito") for a in adv)
+    # fuera del período (LIQ) o borrador (ND): no se advierte
+    assert not any("liquidaciones" in a or "notas de débito" in a for a in adv)
+    assert s["resumen"]["por_tipo"]["FAC"]["Solo en Odoo"] == 1
+
+
+def test_pipeline_sin_advertencia_de_tipo_si_hay_txt(tmp_path, monkeypatch):
+    lector = _Odoo(docs=[_doc_odoo(1, "FAC", "001-001-000000001", _clave(101))])
+    pv, job_id, _, _, _ = _entorno(tmp_path, monkeypatch, {"f.txt": [_fac(1)]}, lector=lector)
+    pv.run_pipeline_ventas(job_id)
+    s = read_status(job_id)
+    assert s["estado"] == "done", s
+    assert not any(a.startswith("Falta el TXT") for a in s["resumen"]["advertencias"])
+
+
 def test_pipeline_rango_amplio_advierte(tmp_path, monkeypatch):
     pv, job_id, lector, _, _ = _entorno(
         tmp_path, monkeypatch, {"f.txt": [_fac(1, "01/07/2026"), _fac(2, "20/09/2026")]})

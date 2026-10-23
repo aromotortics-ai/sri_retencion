@@ -104,7 +104,11 @@ def leer_emitidos_txts(rutas):
 
     # --- retenciones (clave valida de 45-49 digitos, completada a 49)
     r = s[s["_tipo"] == "RET"]
-    r = r[r["CLAVE_ACCESO"].str.fullmatch(r"\d{45,49}")]
+    valida = r["CLAVE_ACCESO"].str.fullmatch(r"\d{45,49}")
+    if (~valida).sum():
+        advertencias.append(f"{int((~valida).sum())} retenciones del TXT se ignoraron por no tener "
+                            "clave de acceso válida")
+    r = r[valida]
     ret = pd.DataFrame({
         "clave": r["CLAVE_ACCESO"].str.zfill(49),
         "serie": r["SERIE_COMPROBANTE"].str.strip(),

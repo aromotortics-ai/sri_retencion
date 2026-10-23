@@ -118,6 +118,14 @@ def _afectada(m, tipo, rev):
     return _txt(rev.get(rev_id)) if tipo == "NC" and rev_id else pd.NA
 
 
+def _estado_ret(r, emitidas):
+    """Estado de la retencion; una emitida publicada pero no autorizada en el SRI se marca
+    "no_autorizada" (conciliar_retenciones la trata como informativa, fuera del cruce)."""
+    if emitidas and r["state"] == "posted" and r.get("edocument_state") != "authorized":
+        return "no_autorizada"
+    return r["state"]
+
+
 class OdooReader:
     def __init__(self, url, db, user, password, proxy_factory=_proxy_con_timeout):
         self._url = url.rstrip("/")
@@ -297,7 +305,7 @@ class OdooReader:
                    ("retention_date", "<=", (hasta + timedelta(days=margen_dias)).isoformat())]
         campos = ["retention_number", "retention_date", "state", "partner_id", "invoice_id", "type"]
         if emitidas:
-            campos.append("auth_retention_number")
+            campos += ["auth_retention_number", "edocument_state"]
         rets = self._search_read_todo("account.move.retention", dominio, campos)
         if not rets:
             return pd.DataFrame(columns=columnas)
@@ -332,7 +340,7 @@ class OdooReader:
                 "id_ret": r["id"],
                 "n_ret": _txt(r["retention_number"]),
                 "fecha": pd.Timestamp(r["retention_date"]) if r["retention_date"] else pd.NaT,
-                "estado": r["state"],
+                "estado": _estado_ret(r, emitidas),
                 "socio": r["partner_id"][1] if r["partner_id"] else "",
                 "ruc": RUC_EMPRESA if emitidas else _txt(vat.get(pid)),
                 "factura": facturas.get(fid, pd.NA),

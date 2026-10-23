@@ -25,6 +25,25 @@ CACHE_XML_DIR = Path(__file__).parent / "cache" / "xml"
 ADV_LIBREOFFICE = "No se pudo recalcular con LibreOffice; Excel recalculará las fórmulas al abrir el archivo"
 
 
+_NOMBRE_TIPO = {"FAC": "facturas", "NC": "notas de crédito", "ND": "notas de débito",
+                "LIQ": "liquidaciones"}
+
+
+def _tipos_sin_txt(docs_sri, odoo, desde, hasta):
+    """Advertencias por cada tipo sin filas en los TXT pero con registros de Odoo (publicados o
+    anulados) dentro de [desde, hasta]: probablemente falta subir ese TXT."""
+    fechas = pd.to_datetime(odoo["fecha"], errors="coerce")
+    en_periodo = odoo[odoo["estado"].isin(["posted", "cancel"])
+                      & (fechas >= pd.Timestamp(desde)) & (fechas <= pd.Timestamp(hasta))]
+    advertencias = []
+    for tipo in TIPOS_DOC:
+        n = int((en_periodo["tipo"] == tipo).sum())
+        if n and not (docs_sri["tipo"] == tipo).any():
+            advertencias.append(f"Falta el TXT de {_NOMBRE_TIPO[tipo]}: los {n} registros de Odoo de "
+                                "ese tipo aparecerán como 'Solo en Odoo'")
+    return advertencias
+
+
 def _retenciones(job_id, ret_txt, odoo_ret, desde, hasta):
     """Descarga los XML (con caché) y concilia las retenciones emitidas. Devuelve (ret, n_sin_xml)."""
     claves = list(ret_txt["clave"])
@@ -57,6 +76,7 @@ def run_pipeline_ventas(job_id: str) -> None:
         if not docs_sri.empty:
             write_status(job_id, "running", "Leyendo comprobantes emitidos de Odoo...", 0.12)
             odoo = lector.fetch_emitidos(desde, hasta)
+            advertencias += _tipos_sin_txt(docs_sri, odoo, desde, hasta)
         else:
             # Solo retenciones: sin documentos del SRI no se listan documentos de Odoo.
             odoo = pd.DataFrame(columns=COLUMNAS_EMITIDOS)

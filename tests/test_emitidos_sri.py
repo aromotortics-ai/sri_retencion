@@ -97,6 +97,21 @@ def test_solo_retenciones(tmp_path):
     assert len(ret) == 1
 
 
+def test_retenciones_sin_clave_valida_se_ignoran_con_advertencia(tmp_path):
+    ret_fila = lambda serie, clave: _fila("Comprobante de Retención", serie, clave, base="", iva="",
+                                          total="")
+    ruta = _txt(tmp_path, "a.txt", [
+        ret_fila("001-001-000000005", _clave(5)),
+        ret_fila("001-001-000000006", ""),
+        ret_fila("001-001-000000007", "12345"),
+    ])
+    _, ret, adv = leer_emitidos_txts([ruta])
+    assert len(ret) == 1
+    assert ("2 retenciones del TXT se ignoraron por no tener clave de acceso válida") in adv
+    _, _, adv = leer_emitidos_txts([_txt(tmp_path, "b.txt", [ret_fila("001-001-000000005", _clave(5))])])
+    assert not any("clave de acceso válida" in a for a in adv)
+
+
 def test_periodo_rango_largo():
     fechas = pd.Series([pd.Timestamp(2026, 9, d) for d in range(1, 16)] + [pd.Timestamp(2026, 7, 20)])
     desde, hasta, adv = periodo_emitidos(fechas)
