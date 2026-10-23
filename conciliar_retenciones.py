@@ -16,6 +16,8 @@ EST_DIF = "Diferencia de valor"
 EST_FAC = "Factura incorrecta en Odoo"
 EST_XML = "XML no disponible"
 EST_INFO = "Informativo (Odoo cancelada/borrador)"
+# Solo retenciones EMITIDAS (conciliar_emitidos): cancelada en Odoo, autorizada en el SRI.
+EST_ANULADO = "Odoo anulado, SRI autorizado"
 
 TOL_CENTAVOS = 2  # tolerancia de $0.02
 
@@ -368,6 +370,8 @@ def _estado_documento(estados):
         return EST_INFO
     if unicos == {EST_XML}:
         return EST_XML
+    if unicos == {EST_ANULADO}:
+        return EST_ANULADO
     if EST_FAC in unicos:
         return EST_FAC
     for est in (EST_OK, EST_SOLO_SRI, EST_SOLO_ODOO):
@@ -377,7 +381,8 @@ def _estado_documento(estados):
 
 
 _TXT_DETALLE = {EST_DIF: "valor", EST_SOLO_SRI: "solo en SRI", EST_SOLO_ODOO: "solo en Odoo",
-                EST_XML: "XML no disponible", EST_FAC: "factura incorrecta"}
+                EST_XML: "XML no disponible", EST_FAC: "factura incorrecta",
+                EST_ANULADO: "anulada en Odoo"}
 
 
 def _detalle(estado, utiles):
@@ -393,9 +398,11 @@ def _detalle(estado, utiles):
         return f"XML no disponible ({lineas})"
     if estado == EST_INFO:
         return f"Odoo cancelada/borrador ({lineas})"
+    if estado == EST_ANULADO:
+        return f"Odoo anulado, SRI autorizado ({lineas})"
     malas = [e for e in utiles if e != EST_OK]
     partes = [f"{_TXT_DETALLE.get(e, e)}: {malas.count(e)}" for e in
-              (EST_FAC, EST_DIF, EST_SOLO_SRI, EST_SOLO_ODOO, EST_XML) if e in malas]
+              (EST_FAC, EST_DIF, EST_SOLO_SRI, EST_SOLO_ODOO, EST_XML, EST_ANULADO) if e in malas]
     texto = f"{len(malas)} de {lineas} con diferencia ({', '.join(partes)})"
     return f"Factura sustento distinta en Odoo; {texto}" if estado == EST_FAC else texto
 
@@ -415,6 +422,7 @@ def resumir_por_documento(ret: pd.DataFrame) -> pd.DataFrame:
     Estado del documento (en este orden):
       1. Las lineas "Informativo" (Odoo cancelada/borrador) se ignoran si hay otras lineas.
       2. Todas Informativo -> Informativo. Todas "XML no disponible" -> XML no disponible.
+         Todas "Odoo anulado, SRI autorizado" (solo emitidas) -> ese estado.
       3. Alguna "Factura incorrecta en Odoo" -> Factura incorrecta en Odoo.
       4. Todas Coincide -> Coincide; todas Solo en SRI -> Solo en SRI; todas Solo en Odoo -> Solo en Odoo.
       5. Cualquier otra cosa (alguna Diferencia de valor, o mezcla como una linea que coincide y otra
