@@ -79,6 +79,24 @@ def _clasificar_solo_odoo(o):
     return EST_SOLO_ODOO, "publicado en Odoo, sin autorización en el SRI"
 
 
+def _preferir_publicado(pares, por_id):
+    """Si la pareja principal de un documento del SRI es un registro CANCELADO y otro registro
+    PUBLICADO quedó como duplicado (p. ej. el cancelado tiene la clave y el publicado cruzó solo por
+    número), el publicado pasa a ser la pareja principal y el cancelado el duplicado."""
+    pares = pares.copy()
+    ambos = pares["idx_sri"].notna() & pares["id_odoo"].notna()
+    for _, g in pares[ambos].groupby("idx_sri"):
+        principal = g[g["cat"] != CAT_DUP]
+        if len(principal) != 1 or por_id[principal["id_odoo"].iloc[0]]["estado"] != "cancel":
+            continue
+        publicados = [i for i in g.index
+                      if g.at[i, "cat"] == CAT_DUP and por_id[g.at[i, "id_odoo"]]["estado"] == "posted"]
+        if publicados:
+            pares.at[principal.index[0], "cat"] = CAT_DUP
+            pares.at[publicados[0], "cat"] = ""
+    return pares
+
+
 def clasificar_documentos(sri: pd.DataFrame, odoo: pd.DataFrame, desde, hasta) -> pd.DataFrame:
     """Estado de cada documento emitido (FAC/NC/ND/LIQ): una fila por pareja o lado sin pareja.
 
@@ -92,6 +110,7 @@ def clasificar_documentos(sri: pd.DataFrame, odoo: pd.DataFrame, desde, hasta) -
         odoo_ord = odoo.iloc[(odoo["estado"] != "posted").argsort(kind="stable")]
     pares = conciliar(sri, odoo_ord, desde, hasta)
     por_id = {o["id"]: o for _, o in odoo.iterrows()}
+    pares = _preferir_publicado(pares, por_id)
 
     filas = []
     for p in pares.itertuples(index=False):

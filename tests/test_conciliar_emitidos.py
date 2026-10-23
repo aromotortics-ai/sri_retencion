@@ -180,6 +180,14 @@ def test_publicado_gana_al_cancelado_con_misma_clave():
     assert por_id[1] == EST_INFO
 
 
+def test_publicado_sin_clave_gana_al_cancelado_con_clave():
+    # El cancelado cruza por clave (pasada 1) y el publicado solo por número (pasada 2).
+    out = _run(_sri({}), _odoo({"id": 1, "estado": "cancel"}, {"id": 2, "clave": pd.NA}))
+    por_id = dict(zip(out["id_odoo"], out["estado"]))
+    assert por_id == {1: EST_INFO, 2: EST_DIF_DATOS}
+    assert EST_DUP not in set(out["estado"]) and EST_ANULADO not in set(out["estado"])
+
+
 # ------------------------------------------------------------------------------ retenciones
 
 RSRI_COLS = ["clave", "n_ret", "fecha", "ruc", "proveedor", "factura", "cod", "pct", "base", "valor"]
