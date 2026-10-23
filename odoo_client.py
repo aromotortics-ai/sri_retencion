@@ -22,6 +22,12 @@ COLUMNAS = ["id", "num", "nfac", "socio", "ruc", "fecha", "tipo", "cod_comp", "c
             "base", "iva", "total", "afectada", "elegible"]
 COLUMNAS_RET = ["id_ret", "n_ret", "fecha", "estado", "socio", "ruc", "factura", "pct",
                 "base", "valor", "cod"]
+COLUMNAS_EMITIDOS = ["id", "num", "nfac", "socio", "ruc", "fecha", "tipo", "clave", "base",
+                     "iva", "total", "afectada", "estado", "electronico", "elegible"]
+# Codigo de account.receipt.type -> tipo de documento emitido (ventas). Verificado en
+# solo lectura: los ids 3 (Liquidacion de compra) y 15 (Comprobante por reembolso) tienen code "03".
+TIPOS_EMITIDOS = {"01": "FAC", "04": "NC", "05": "ND"}
+CODIGOS_LIQUIDACION = ("03",)
 _NUM_DOC = re.compile(r"\d{3}-\d{3}-\d{9}")
 
 
@@ -184,6 +190,69 @@ class OdooReader:
                 "elegible": cod in TIPOS and clave is not pd.NA and not propio,
             })
         return pd.DataFrame(filas, columns=COLUMNAS)
+
+    def fetch_emitidos(self, desde: date, hasta: date, margen_dias: int = 5) -> pd.DataFrame:
+        """Documentos EMITIDOS por la empresa: FAC/NC/ND (ventas) y LIQ (liquidaciones de compra)."""
+        try:
+            return self._fetch_emitidos(desde, hasta, margen_dias)
+        except OdooError:
+            raise
+        except Exception:
+            raise OdooError("No se pudo consultar Odoo (error de conexión o de la consulta)") from None
+
+    def _fetch_emitidos(self, desde, hasta, margen_dias):
+        self._conectar()
+        dominio = [("state", "in", ["posted", "cancel", "draft"]),
+                   ("move_type", "in", ["out_invoice", "out_refund", "in_invoice"]),
+                   ("invoice_date", ">=", (desde - timedelta(days=margen_dias)).isoformat()),
+                   ("invoice_date", "<=", (hasta + timedelta(days=margen_dias)).isoformat())]
+        moves = self._search_read_todo("account.move", dominio, CAMPOS)
+        if not moves:
+            return pd.DataFrame(columns=COLUMNAS_EMITIDOS)
+
+        codigos = {t["id"]: t["code"] for t in
+                   self._call("account.receipt.type", "search_read", [[]], fields=["code"])}
+
+        def tipo_de(m):
+            cod = codigos.get(m["x_receipt_type_id"][0] if m["x_receipt_type_id"] else None, "")
+            if m["move_type"] == "in_invoice":  # compras: solo las liquidaciones se emiten
+                return "LIQ" if cod in CODIGOS_LIQUIDACION else None
+            return TIPOS_EMITIDOS.get(cod)
+
+        moves = [(m, t) for m in moves if (t := tipo_de(m))]
+        if not moves:
+            return pd.DataFrame(columns=COLUMNAS_EMITIDOS)
+
+        pids = sorted({m["partner_id"][0] for m, _ in moves if m["partner_id"]})
+        vat = {p["id"]: p["vat"] for p in self._call("res.partner", "read", [pids], fields=["vat"])} if pids else {}
+        rids = sorted({m["reversed_entry_id"][0] for m, t in moves
+                       if t == "NC" and m["reversed_entry_id"]})
+        rev = ({r["id"]: r["x_number"] for r in
+                self._call("account.move", "search_read", [[("id", "in", rids)]],
+                           fields=["x_number"])} if rids else {})
+
+        filas = []
+        for m, tipo in moves:
+            pid = m["partner_id"][0] if m["partner_id"] else None
+            rev_id = m["reversed_entry_id"][0] if m["reversed_entry_id"] else None
+            filas.append({
+                "id": m["id"],
+                "num": m["name"],
+                "nfac": _txt(m["x_number"]),
+                "socio": m["partner_id"][1] if m["partner_id"] else "",
+                "ruc": _txt(vat.get(pid)),
+                "fecha": pd.Timestamp(m["invoice_date"]) if m["invoice_date"] else pd.NaT,
+                "tipo": tipo,
+                "clave": _clave(m["x_authorization_number"]),
+                "base": abs(float(m["amount_untaxed"])),
+                "iva": abs(float(m["amount_tax"])),
+                "total": abs(float(m["amount_total"])),
+                "afectada": _txt(rev.get(rev_id)) if tipo == "NC" and rev_id else pd.NA,
+                "estado": m["state"],
+                "electronico": bool(m["x_is_edocument"]),
+                "elegible": m["state"] in ("posted", "cancel"),
+            })
+        return pd.DataFrame(filas, columns=COLUMNAS_EMITIDOS)
 
     def fetch_retenciones(self, desde: date, hasta: date, margen_dias: int = 5) -> pd.DataFrame:
         """Retenciones RECIBIDAS (out_retention), todos los estados; una fila por linea."""
