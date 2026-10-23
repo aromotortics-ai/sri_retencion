@@ -120,6 +120,41 @@ def test_hojas_y_resumen(tmp_path):
                                              "Total_SRI", "Total_Odoo", "Diferencia", "Detalle"]
 
 
+def _fila_resumen(ws, etiqueta):
+    return next(r for r in range(5, ws.max_row + 1) if ws.cell(row=r, column=1).value == etiqueta)
+
+
+def test_resumen_formulas_fila_fac(tmp_path):
+    _, wb = _construir(tmp_path)
+    rs = wb["Resumen"]
+    r = _fila_resumen(rs, "FAC")
+    assert r == 5
+    conc = "Conciliacion!${c}$2:${c}$7"
+    a, b, g = (conc.format(c=c) for c in "ABG")
+    assert rs["D5"].value == f'=COUNTIFS({a},$A5,{b},"{EST_OK}")'
+    assert rs["K5"].value == f'=SUMIFS({g},{a},$A5,{b},"<>Duplicado en Odoo",{b},"<>{EST_INFO}")'
+
+
+def test_total_odoo_retenciones_excluye_anuladas(tmp_path):
+    import re
+    ret = _ret()
+    _, wb = _construir(tmp_path, ret=ret)
+    rs = wb["Resumen"]
+    r = _fila_resumen(rs, "Retenciones")
+    f = rs[f"L{r}"].value
+    assert f'"<>{cr.EST_INFO}"' in f and f'"<>{cr.EST_ANULADO}"' in f
+    assert f.startswith("=SUMIFS(Ret_Documentos!$K$")
+    # evaluar el SUMIFS: estados (columna A, texto) de Ret_Documentos y valor Odoo por documento
+    excluidos = set(re.findall(r'"<>([^"]*)"', f))
+    odoo_por_doc = ret.groupby("n_ret")["valor_odoo"].sum(min_count=1).fillna(0).to_dict()
+    ws = wb["Ret_Documentos"]
+    total = sum(odoo_por_doc[ws.cell(row=i, column=2).value] for i in range(2, ws.max_row + 1)
+                if ws.cell(row=i, column=1).value not in excluidos)
+    # solo cuenta la retención que coincide (10); la anulada (10) y la informativa (10) no
+    assert total == 10.0
+    assert rs[f"M{r}"].value == f"=K{r}-L{r}"
+
+
 def test_diferencia_es_formula(tmp_path):
     _, wb = _construir(tmp_path)
     for hoja in ("Conciliacion", "Diferencias"):

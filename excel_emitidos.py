@@ -150,8 +150,13 @@ def _resumen(wb, n, desde, hasta, ret, advertencias):
         sig = fila_resumen_retenciones(rs, rr, len(ret), periodo=(desde, hasta), periodo_compras=(desde, hasta),
                                        doc_n=contadores["documentos"]) + 1
         lim_d = max(contadores["documentos"], 1) + 1
+        est_d, val_o = f"Ret_Documentos!$A$2:$A${lim_d}", f"Ret_Documentos!$K$2:$K${lim_d}"
+        # Total Odoo: como en las filas de documentos, sin informativos ni anuladas en Odoo (el valor
+        # cancelado no cuenta, así la retención anulada aparece en Dif. total).
+        rs[f"L{rr}"] = (f'=SUMIFS({val_o},{est_d},"<>{cr.EST_INFO}",'
+                        f'{est_d},"<>{cr.EST_ANULADO}")')
         rs[f"N{rr}"] = 0  # la diferencia de datos no aplica a retenciones
-        rs[f"O{rr}"] = f'=COUNTIFS(Ret_Documentos!$A$2:$A${lim_d},"{cr.EST_ANULADO}")'
+        rs[f"O{rr}"] = f'=COUNTIFS({est_d},"{cr.EST_ANULADO}")'
     _fuente(rs, 4)
     for col in "ABCDEFGHIJKLMNO":
         rs[f"{col}{tot}"].font = Font(name=FONT, bold=True)
