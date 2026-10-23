@@ -16,7 +16,9 @@ COLORES = {"Resumen": "1F4E79", "Conciliacion": "1F4E79", "Solo_en_SRI": "ED7D31
            "Ret_Documentos": "1F4E79", "Ret_Conciliacion": "1F4E79", "Ret_Solo_SRI": "ED7D31",
            "Ret_Solo_Odoo": "C00000",
            "Ret_Diferencia_Valor": "FFC000", "Ret_Factura_Incorrecta": "7030A0", "Ret_Informativos": "808080",
-           "SRI_Listado": "808080", "Odoo_Lineas": "808080"}
+           "SRI_Listado": "808080", "Odoo_Lineas": "808080",
+           # hojas propias del libro de emitidos (excel_emitidos.py)
+           "Diferencias": "FFC000", "Anulados_Odoo": "7030A0"}
 _PELIGROSOS = ("=", "+", "-", "@")
 FUERA = "Fecha fuera del período"
 
