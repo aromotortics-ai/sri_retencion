@@ -204,12 +204,15 @@ def test_upload_ventas_rechaza_no_txt(client, monkeypatch):
     assert r.status_code == 400
 
 
-def test_upload_ventas_rechaza_mas_de_60_archivos(client, monkeypatch):
+def test_upload_ventas_acepta_mas_de_60_archivos_y_rechaza_sobre_el_maximo(client, monkeypatch):
     import app as app_module
     monkeypatch.setattr(app_module, "run_pipeline_ventas", lambda job_id: None)
     cookies = _login(client)
-    files = [("emitidos", (f"e{i}.txt", b"x", "text/plain")) for i in range(61)]
-    assert client.post("/upload-ventas", cookies=cookies, files=files).status_code == 400
+    n_max = app_module.MAX_TXT_VENTAS
+    mas_de_60 = [("emitidos", (f"e{i}.txt", b"x", "text/plain")) for i in range(61)]
+    assert client.post("/upload-ventas", cookies=cookies, files=mas_de_60).status_code == 200
+    sobre_max = [("emitidos", (f"e{i}.txt", b"x", "text/plain")) for i in range(n_max + 1)]
+    assert client.post("/upload-ventas", cookies=cookies, files=sobre_max).status_code == 400
 
 
 def test_upload_ventas_ya_no_pide_excel_de_odoo(client, monkeypatch):

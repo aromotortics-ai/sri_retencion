@@ -166,7 +166,7 @@
     } else if (mode === "ventas") {
       const txts = document.getElementById("emitidos-files").files;
       if (!txts.length) { alert("Selecciona los TXT del SRI."); return; }
-      if (txts.length > 60) { alert("Máximo 60 archivos."); return; }
+      if (txts.length > 400) { alert("Máximo 400 archivos."); return; }
       for (const f of txts) fd.append("emitidos", f);
       url = "/upload-ventas";
     } else {

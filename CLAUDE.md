@@ -246,7 +246,7 @@ XML (montos y `numDocSustento` solo existen ahí) y usan el caché compartido `c
 
 Concilia lo que la **empresa emite**: facturas (FAC), notas de crédito (NC), notas de débito (ND),
 liquidaciones de compra (LIQ) y retenciones emitidas (RET). Uso semanal: el usuario sube **todos los TXT de
-la semana** del portal SRI (hasta 60, tipos mezclados, con cualquier nombre de archivo) y Odoo 14 se lee
+la semana** del portal SRI (hasta 400, tipos mezclados, con cualquier nombre de archivo) y Odoo 14 se lee
 por XML-RPC en solo lectura (mismas variables `ODOO_*` que Compras). Ya no se sube `reten_odoo.xlsx` ni
 ningún Excel de Odoo.
 

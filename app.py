@@ -30,6 +30,7 @@ LOGIN_TEMPLATE = BASE_DIR / "templates" / "login.html"
 # Si no se configura, se genera una nueva en cada arranque (invalida sesiones activas).
 SECRET_KEY    = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
 SESSION_HOURS = int(os.environ.get("SESSION_HOURS", "8"))
+MAX_TXT_VENTAS = 400  # TXT por envío en Ventas (un mes de TXT diarios de varios tipos cabe de sobra)
 COOKIE_NAME   = "sri_session"
 
 
@@ -156,8 +157,9 @@ async def upload_ventas(
     emitidos: list[UploadFile] = File(...),
     _user: str = Depends(require_session),
 ):
-    if not 1 <= len(emitidos) <= 60:
-        raise HTTPException(status_code=400, detail="Sube entre 1 y 60 archivos TXT del SRI")
+    if not 1 <= len(emitidos) <= MAX_TXT_VENTAS:
+        raise HTTPException(status_code=400,
+                            detail=f"Sube entre 1 y {MAX_TXT_VENTAS} archivos TXT del SRI")
     nombres = _nombres_txt(emitidos)
 
     job_id = create_job()
