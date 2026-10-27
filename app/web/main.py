@@ -130,8 +130,11 @@ _RUTA_SUBIDA = re.compile(r"/sesion/[^/]+/txt")
 _MSG_413 = b'{"detail":"Archivo o env\\u00edo demasiado grande"}'
 
 
-class _CuerpoExcesivo(Exception):
-    pass
+class _CuerpoExcesivo(HTTPException):
+    """HTTPException: FastAPI la re-lanza tal cual en vez de convertirla en un 400 de parseo."""
+
+    def __init__(self):
+        super().__init__(status_code=413, detail="Archivo o envío demasiado grande")
 
 
 class LimiteSubida:
@@ -148,14 +151,12 @@ class LimiteSubida:
                 or not _RUTA_SUBIDA.fullmatch(scope["path"])):
             return await self.app(scope, receive, send)
         limite = MAX_BYTES_LOTE + SLACK_MULTIPART
-        cl = dict(scope["headers"]).get(b"content-length")
-        try:
-            if cl is not None and int(cl) > limite:
-                return await self._rechazar(send)
-        except ValueError:
+        cls = [v for k, v in scope["headers"] if k == b"content-length"]
+        if len(cls) > 1 or (cls and not cls[0].strip().isdigit()):
             return await self._rechazar(send, 400)
+        if cls and int(cls[0]) > limite:
+            return await self._rechazar(send)
         recibidos = 0
-        iniciada = False
 
         async def receive_limitado():
             nonlocal recibidos
@@ -166,17 +167,7 @@ class LimiteSubida:
                     raise _CuerpoExcesivo
             return msg
 
-        async def send_visto(msg):
-            nonlocal iniciada
-            if msg["type"] == "http.response.start":
-                iniciada = True
-            await send(msg)
-
-        try:
-            await self.app(scope, receive_limitado, send_visto)
-        except _CuerpoExcesivo:
-            if not iniciada:
-                await self._rechazar(send)
+        await self.app(scope, receive_limitado, send)
 
     @staticmethod
     async def _rechazar(send, status=413):

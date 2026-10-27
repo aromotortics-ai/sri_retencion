@@ -285,30 +285,45 @@ def test_content_length_excesivo_da_413_sin_tocar_la_sesion(entorno_sesion, monk
     assert _subir(client, cookies, sid, ("ok.txt", _txt(1))).status_code == 200
 
 
-def test_guardia_sin_content_length_corta_el_flujo(monkeypatch):
-    import asyncio
+def test_stream_sin_content_length_da_413_por_la_app_real(entorno_sesion, monkeypatch):
     import app.web.main as app_module
+    client, cookies, _ = entorno_sesion
+    sid = _crear(client, cookies)
     monkeypatch.setattr(app_module, "MAX_BYTES_LOTE", 100)
     monkeypatch.setattr(app_module, "SLACK_MULTIPART", 0)
-    leidos, enviados = [], []
+    cuerpo = (b'--zzz\r\nContent-Disposition: form-data; name="archivos"; filename="a.txt"\r\n'
+              b'Content-Type: text/plain\r\n\r\n' + b"x" * 500 + b'\r\n--zzz--\r\n')
 
-    async def app_interna(scope, receive, send):
-        while True:
-            msg = await receive()
-            leidos.append(len(msg.get("body", b"")))
-            if not msg.get("more_body"):
-                break
+    def gen():
+        for i in range(0, len(cuerpo), 50):
+            yield cuerpo[i:i + 50]
 
-    async def receive():
-        return {"type": "http.request", "body": b"x" * 60, "more_body": True}
+    r = client.post(f"/sesion/{sid}/txt", cookies=cookies, content=gen(),
+                    headers={"content-type": "multipart/form-data; boundary=zzz"})
+    assert "content-length" not in r.request.headers
+    assert r.status_code == 413
+    assert "demasiado grande" in r.json()["detail"]
+    monkeypatch.setattr(app_module, "MAX_BYTES_LOTE", 200 * 1024 * 1024)
+    assert client.delete(f"/sesion/{sid}/txt/nada.txt", cookies=cookies).json()["archivos"] == []
 
-    async def send(msg):
-        enviados.append(msg)
 
-    scope = {"type": "http", "method": "POST", "path": "/sesion/abcdef01/txt", "headers": []}
-    asyncio.run(app_module.LimiteSubida(app_interna)(scope, receive, send))
-    assert enviados[0]["status"] == 413
-    assert len(leidos) == 1  # el segundo bloque (120 > 100) nunca llegó a la app
+def test_content_length_invalido_da_400(entorno_sesion):
+    import asyncio
+    import app.web.main as app_module
+    for headers in ([(b"content-length", b"-5")], [(b"content-length", b"abc")],
+                    [(b"content-length", b"5"), (b"content-length", b"5")]):
+        enviados = []
+
+        async def send(m):
+            enviados.append(m)
+
+        async def inner(*a):
+            raise AssertionError("no debe llegar a la app")
+
+        scope = {"type": "http", "method": "POST", "path": "/sesion/abcdef01/txt",
+                 "headers": headers}
+        asyncio.run(app_module.LimiteSubida(inner)(scope, None, send))
+        assert enviados[0]["status"] == 400 and len(enviados) == 2
 
 
 def test_subida_masiva_programa_una_sola_limpieza(entorno_sesion):
