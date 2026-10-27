@@ -64,23 +64,12 @@
   </div>
   <p class="subtitle" id="subtitle">Sube los archivos y descarga el Excel de conciliación.</p>
   <div class="tabs">
-    <button class="tab active" id="tab-retenciones" onclick="setMode('retenciones')">Retenciones</button>
     <button class="tab" id="tab-ventas" onclick="setMode('ventas')">Ventas</button>
-    <button class="tab" id="tab-compras" onclick="setMode('compras')">Compras</button>
+    <button class="tab active" id="tab-compras" onclick="setMode('compras')">Compras</button>
   </div>
 
   <!-- Formulario -->
   <div id="form-section">
-    <div id="form-retenciones">
-      <div class="field">
-        <label>1. Archivo TXT del portal SRI</label>
-        <input type="file" id="txt-file" accept=".txt">
-      </div>
-      <div class="field">
-        <label>2. Reporte de retenciones de Odoo (.xlsx)</label>
-        <input type="file" id="xlsx-file" accept=".xlsx">
-      </div>
-    </div>
     <div id="form-ventas" style="display:none;">
       <div class="field">
         <label>TXT del portal SRI (comprobantes emitidos)</label>
@@ -88,7 +77,7 @@
         <p class="file-count" id="emitidos-count">Sube todos los TXT de emitidos de la semana (facturas, notas de crédito, notas de débito, liquidaciones y retenciones). Odoo se lee automáticamente.</p>
       </div>
     </div>
-    <div id="form-compras" style="display:none;">
+    <div id="form-compras">
       <div class="field">
         <label>TXT del portal SRI (comprobantes recibidos)</label>
         <input type="file" id="compras-files" accept=".txt" multiple>
@@ -125,11 +114,11 @@
   let pollInterval = null;
   let startTime   = null;
   let currentJobId = null;
-  let mode = "retenciones";
+  let mode = "compras";
 
   function setMode(m) {
     mode = m;
-    ["retenciones","ventas","compras"].forEach(k => {
+    ["ventas","compras"].forEach(k => {
       document.getElementById("tab-" + k).classList.toggle("active", k === m);
       document.getElementById("form-" + k).style.display = k === m ? "block" : "none";
     });
@@ -163,19 +152,12 @@
       if (txts.length > 5) { alert("Máximo 5 archivos."); return; }
       for (const f of txts) fd.append("sri", f);
       url = "/upload-compras";
-    } else if (mode === "ventas") {
+    } else {
       const txts = document.getElementById("emitidos-files").files;
       if (!txts.length) { alert("Selecciona los TXT del SRI."); return; }
       if (txts.length > 400) { alert("Máximo 400 archivos."); return; }
       for (const f of txts) fd.append("emitidos", f);
       url = "/upload-ventas";
-    } else {
-      const txt  = document.getElementById("txt-file").files[0];
-      const xlsx = document.getElementById("xlsx-file").files[0];
-      if (!txt || !xlsx) { alert("Selecciona ambos archivos."); return; }
-      fd.append("recibidos", txt);
-      fd.append("reten_odoo", xlsx);
-      url = "/upload";
     }
     document.getElementById("btn-procesar").disabled = true;
 
@@ -222,25 +204,8 @@
 
   function showResult(job_id, resumen) {
     show("result-section");
-    const grid = document.getElementById("stat-grid");
-    if (mode === "compras") { showResultCompras(job_id, resumen); return; }
-    if (mode === "ventas") { showResultVentas(job_id, resumen); return; }
-    const rows = [
-      ["Retenciones SRI",           resumen.n_listado,       ""],
-      ["XMLs descargados",          resumen.n_xml,           resumen.n_xml === resumen.n_listado ? "ok" : "warn"],
-      ["Líneas coinciden",          resumen.coinciden,       "ok"],
-      ["Solo en SRI · pendientes",  resumen.solo_sri,        resumen.solo_sri > 0 ? "warn" : "ok"],
-      ["Solo en Odoo · revisar",    resumen.solo_odoo,       resumen.solo_odoo > 0 ? "warn" : "ok"],
-      ["Factura incorrecta en Odoo",resumen.fac_incorrecta,  resumen.fac_incorrecta > 0 ? "warn" : "ok"],
-      ["Diferencias de valor",      resumen.diff_valor,      resumen.diff_valor > 0 ? "warn" : "ok"],
-    ];
-    grid.innerHTML = rows.map(([label, val, cls]) =>
-      `<span class="stat-label">${label}</span>` +
-      `<span class="stat-value ${cls}">${val ?? "&#x2014;"}</span>`
-    ).join("");
-    document.getElementById("btn-download").onclick = () => {
-      window.location = `/download/${job_id}`;
-    };
+    if (mode === "compras") showResultCompras(job_id, resumen);
+    else showResultVentas(job_id, resumen);
   }
 
   function esc(t) {
@@ -306,8 +271,6 @@
   function reset() {
     clearInterval(pollInterval);
     currentJobId = null;
-    document.getElementById("txt-file").value = "";
-    document.getElementById("xlsx-file").value = "";
     document.getElementById("emitidos-files").value = "";
     document.getElementById("compras-files").value = "";
     document.getElementById("emitidos-count").textContent =

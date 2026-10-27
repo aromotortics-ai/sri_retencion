@@ -1,7 +1,6 @@
 """
 Aplicación FastAPI para el pipeline de conciliación SRI.
-Endpoints: GET/POST /login, GET /logout, GET /, POST /upload (retenciones recibidas con
-reten_odoo.xlsx), POST /upload-ventas (emitidos), POST /upload-compras (recibidos),
+Endpoints: GET/POST /login, GET /logout, GET /, POST /upload-ventas (emitidos), POST /upload-compras (recibidos),
 GET /status/{job_id}, GET /download/{job_id}
 Auth: cookie de sesión firmada con itsdangerous (SESSION_HOURS, default 8 h)
 """
@@ -17,7 +16,6 @@ from itsdangerous import TimestampSigner, BadSignature, SignatureExpired
 
 from auth import verify_user
 from job_manager import create_job, read_status, get_job_dir, mark_stale_jobs_as_error
-from pipeline import run_pipeline
 from pipeline_ventas import run_pipeline_ventas
 from pipeline_compras import run_pipeline_compras
 
@@ -132,24 +130,6 @@ def index(request: Request):
     if not _current_user(request):
         return RedirectResponse("/login", status_code=302)
     return TEMPLATE.read_text(encoding="utf-8")
-
-
-@app.post("/upload")
-async def upload(
-    recibidos: UploadFile = File(...),
-    reten_odoo: UploadFile = File(...),
-    _user: str = Depends(require_session),
-):
-    job_id  = create_job()
-    job_dir = get_job_dir(job_id)
-
-    (job_dir / "Recibidos.txt").write_bytes(await recibidos.read())
-    (job_dir / "reten_odoo.xlsx").write_bytes(await reten_odoo.read())
-
-    t = threading.Thread(target=run_pipeline, args=(job_id,), daemon=True)
-    t.start()
-
-    return {"job_id": job_id}
 
 
 @app.post("/upload-ventas")

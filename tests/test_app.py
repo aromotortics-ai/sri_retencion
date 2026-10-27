@@ -57,17 +57,6 @@ def test_root_returns_html_with_valid_session(client):
     assert "text/html" in r.headers["content-type"]
 
 
-def test_upload_returns_401_without_session(client):
-    r = client.post("/upload")
-    assert r.status_code == 401
-
-
-def test_upload_missing_files_with_session(client):
-    cookies = _login(client)
-    r = client.post("/upload", cookies=cookies)
-    assert r.status_code == 422
-
-
 def test_status_unknown_job(client):
     cookies = _login(client)
     r = client.get("/status/xxxxxxxx", cookies=cookies)
@@ -88,35 +77,6 @@ def test_logout_clears_session(client):
     r2 = client.get("/")
     assert r2.status_code == 302
     assert "/login" in r2.headers["location"]
-
-
-def test_upload_creates_job(client, tmp_path, monkeypatch):
-    """Upload con archivos válidos debe retornar job_id y estado pending."""
-    import app as app_module
-    monkeypatch.setattr(app_module, "run_pipeline", lambda job_id: None)
-
-    cookies = _login(client)
-    txt_content  = (FIXTURES / "2390000831001_Recibidos.txt").read_bytes()
-    xlsx_content = (FIXTURES / "reten_odoo.xlsx").read_bytes()
-
-    r = client.post(
-        "/upload",
-        cookies=cookies,
-        files={
-            "recibidos":   ("Recibidos.txt",  txt_content,  "text/plain"),
-            "reten_odoo":  ("reten_odoo.xlsx", xlsx_content,
-                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
-        },
-    )
-    assert r.status_code == 200
-    data = r.json()
-    assert "job_id" in data
-    assert len(data["job_id"]) == 8
-
-    job_id = data["job_id"]
-    r2 = client.get(f"/status/{job_id}", cookies=cookies)
-    assert r2.status_code == 200
-    assert r2.json()["estado"] in ("pending", "running", "done")
 
 
 def test_upload_ventas_returns_401_without_session(client):
