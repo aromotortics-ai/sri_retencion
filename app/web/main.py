@@ -125,6 +125,70 @@ _DESCARGAS = {"completo": "Conciliacion_SRI.xlsx", "observaciones": "Observacion
 MAX_BYTES_TXT = 20 * 1024 * 1024    # por archivo (un TXT diario del portal pesa mucho menos)
 MAX_BYTES_LOTE = 200 * 1024 * 1024  # por solicitud
 _CHUNK = 1024 * 1024
+SLACK_MULTIPART = 1024 * 1024       # sobrecarga del multipart sobre MAX_BYTES_LOTE
+_RUTA_SUBIDA = re.compile(r"/sesion/[^/]+/txt")
+_MSG_413 = b'{"detail":"Archivo o env\\u00edo demasiado grande"}'
+
+
+class _CuerpoExcesivo(Exception):
+    pass
+
+
+class LimiteSubida:
+    """Guardia ASGI: corta la subida de TXT antes de que se analice (y se guarde) el cuerpo.
+
+    Usa Content-Length si viene; si no (chunked), cuenta los bytes mientras llegan.
+    Los topes finos por archivo siguen en el handler."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if (scope["type"] != "http" or scope["method"] != "POST"
+                or not _RUTA_SUBIDA.fullmatch(scope["path"])):
+            return await self.app(scope, receive, send)
+        limite = MAX_BYTES_LOTE + SLACK_MULTIPART
+        cl = dict(scope["headers"]).get(b"content-length")
+        try:
+            if cl is not None and int(cl) > limite:
+                return await self._rechazar(send)
+        except ValueError:
+            return await self._rechazar(send, 400)
+        recibidos = 0
+        iniciada = False
+
+        async def receive_limitado():
+            nonlocal recibidos
+            msg = await receive()
+            if msg["type"] == "http.request":
+                recibidos += len(msg.get("body", b""))
+                if recibidos > limite:
+                    raise _CuerpoExcesivo
+            return msg
+
+        async def send_visto(msg):
+            nonlocal iniciada
+            if msg["type"] == "http.response.start":
+                iniciada = True
+            await send(msg)
+
+        try:
+            await self.app(scope, receive_limitado, send_visto)
+        except _CuerpoExcesivo:
+            if not iniciada:
+                await self._rechazar(send)
+
+    @staticmethod
+    async def _rechazar(send, status=413):
+        cuerpo = _MSG_413 if status == 413 else b'{"detail":"Content-Length inv\\u00e1lido"}'
+        await send({"type": "http.response.start", "status": status,
+                    "headers": [(b"content-type", b"application/json"),
+                                (b"content-length", str(len(cuerpo)).encode()),
+                                (b"connection", b"close")]})
+        await send({"type": "http.response.body", "body": cuerpo})
+
+
+app.add_middleware(LimiteSubida)
 XLSX_MEDIA = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 

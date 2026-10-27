@@ -268,6 +268,49 @@ def test_archivo_sobre_el_maximo_da_413(entorno_sesion, monkeypatch):
     assert _subir(client, cookies, sid, ("a.txt", b"x" * 80), ("b.txt", b"x" * 80)).status_code == 413
 
 
+def test_content_length_excesivo_da_413_sin_tocar_la_sesion(entorno_sesion, monkeypatch):
+    import app.web.main as app_module
+    from test_sesion import _txt
+    client, cookies, _ = entorno_sesion
+    sid = _crear(client, cookies)
+    monkeypatch.setattr(app_module, "MAX_BYTES_LOTE", 100)
+    monkeypatch.setattr(app_module, "SLACK_MULTIPART", 100)
+    r = client.post(f"/sesion/{sid}/txt", cookies=cookies, content=b"x" * 5000,
+                    headers={"content-type": "multipart/form-data; boundary=zzz"})
+    assert r.status_code == 413
+    assert "demasiado grande" in r.json()["detail"]
+    monkeypatch.setattr(app_module, "MAX_BYTES_LOTE", 200 * 1024 * 1024)
+    monkeypatch.setattr(app_module, "SLACK_MULTIPART", 1024 * 1024)
+    assert client.delete(f"/sesion/{sid}/txt/nada.txt", cookies=cookies).json()["archivos"] == []
+    assert _subir(client, cookies, sid, ("ok.txt", _txt(1))).status_code == 200
+
+
+def test_guardia_sin_content_length_corta_el_flujo(monkeypatch):
+    import asyncio
+    import app.web.main as app_module
+    monkeypatch.setattr(app_module, "MAX_BYTES_LOTE", 100)
+    monkeypatch.setattr(app_module, "SLACK_MULTIPART", 0)
+    leidos, enviados = [], []
+
+    async def app_interna(scope, receive, send):
+        while True:
+            msg = await receive()
+            leidos.append(len(msg.get("body", b"")))
+            if not msg.get("more_body"):
+                break
+
+    async def receive():
+        return {"type": "http.request", "body": b"x" * 60, "more_body": True}
+
+    async def send(msg):
+        enviados.append(msg)
+
+    scope = {"type": "http", "method": "POST", "path": "/sesion/abcdef01/txt", "headers": []}
+    asyncio.run(app_module.LimiteSubida(app_interna)(scope, receive, send))
+    assert enviados[0]["status"] == 413
+    assert len(leidos) == 1  # el segundo bloque (120 > 100) nunca llegó a la app
+
+
 def test_subida_masiva_programa_una_sola_limpieza(entorno_sesion):
     client, cookies, programadas = entorno_sesion
     sid = _crear(client, cookies, "ventas")
