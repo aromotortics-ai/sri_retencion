@@ -232,6 +232,7 @@ def test_pipeline_xml_todos_fallidos(tmp_path, monkeypatch):
     assert r["retenciones_fallidos"] == 2
     assert ("2 XML de retenciones no se pudieron descargar o leer; sus retenciones se listan como "
             "'XML no disponible'") in r["advertencias"]
+    assert "Motivo de las descargas fallidas: NO AUTORIZADO (×2)" in r["advertencias"]
     assert r["por_tipo"]["RET"]["XML no disponible"] == 2
     json.dumps(r)
 

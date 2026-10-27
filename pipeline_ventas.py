@@ -17,7 +17,7 @@ from excel_emitidos import construir_excel_emitidos
 from job_manager import write_status, schedule_cleanup, get_job_dir
 from odoo_client import COLUMNAS_EMITIDOS, OdooReader
 from pipeline_compras import descargar_con_progreso
-from xml_cache import descargar_xmls, lineas_sri
+from xml_cache import descargar_xmls, lineas_sri, resumir_motivos
 
 # Caché de XML compartido entre jobs (misma ruta que pipeline_compras.CACHE_XML_DIR).
 CACHE_XML_DIR = Path(__file__).parent / "cache" / "xml"
@@ -45,16 +45,16 @@ def _tipos_sin_txt(docs_sri, odoo, desde, hasta):
 
 
 def _retenciones(job_id, ret_txt, odoo_ret, desde, hasta):
-    """Descarga los XML (con caché) y concilia las retenciones emitidas. Devuelve (ret, n_sin_xml)."""
+    """Descarga los XML (con caché) y concilia las retenciones emitidas. Devuelve (ret, n_sin_xml, fallidos)."""
     claves = list(ret_txt["clave"])
-    descargar_con_progreso(claves, descargar_xmls, CACHE_XML_DIR,
-                           lambda m, p: write_status(job_id, "running", m, p))
+    fallidos = descargar_con_progreso(claves, descargar_xmls, CACHE_XML_DIR,
+                                      lambda m, p: write_status(job_id, "running", m, p))
     lineas = lineas_sri(claves, CACHE_XML_DIR, contraparte=True)
     # Sin líneas = no descargado o XML ilegible/vacío: todos terminan como "XML no disponible".
     n_sin_xml = len(set(claves) - set(lineas["clave"]))
     write_status(job_id, "running", "Conciliando retenciones...", 0.7)
     ret = conciliar_retenciones_emitidas(lineas, odoo_ret, ret_txt, desde, hasta)
-    return ret, n_sin_xml
+    return ret, n_sin_xml, fallidos
 
 
 def run_pipeline_ventas(job_id: str) -> None:
@@ -87,11 +87,13 @@ def run_pipeline_ventas(job_id: str) -> None:
 
         ret, n_sin_xml = None, 0
         if odoo_ret is not None:
-            ret, n_sin_xml = _retenciones(job_id, ret_txt, odoo_ret, desde, hasta)
+            ret, n_sin_xml, fallidos = _retenciones(job_id, ret_txt, odoo_ret, desde, hasta)
             if n_sin_xml:
                 advertencias.append(
                     f"{n_sin_xml} XML de retenciones no se pudieron descargar o leer; sus retenciones "
                     "se listan como 'XML no disponible'")
+                if fallidos:
+                    advertencias.append(f"Motivo de las descargas fallidas: {resumir_motivos(fallidos)}")
 
         write_status(job_id, "running", "Conciliando SRI vs Odoo...", 0.85)
         docs = clasificar_documentos(docs_sri, odoo, desde, hasta)

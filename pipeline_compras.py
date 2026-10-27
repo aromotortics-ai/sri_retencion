@@ -14,7 +14,7 @@ from conciliar_compras import conciliar_compras, leer_sri_txts
 from conciliar_retenciones import conciliar_retenciones, leer_sri_retenciones_txt
 from job_manager import write_status, schedule_cleanup, get_job_dir
 from odoo_client import COLUMNAS as COLUMNAS_ODOO_COMPRAS, OdooReader
-from xml_cache import descargar_xmls, lineas_sri
+from xml_cache import descargar_xmls, lineas_sri, resumir_motivos
 
 # Caché de XML compartido entre jobs (misma ruta que pipeline.CACHE_XML_DIR).
 CACHE_XML_DIR = Path(__file__).parent / "cache" / "xml"
@@ -63,7 +63,7 @@ def descargar_con_progreso(claves, descargar, cache_dir, avisar):
 
 
 def _retenciones(job_id, sri_ret, lector):
-    """Lee Odoo, descarga XML y concilia retenciones. Devuelve (ret, desde, hasta, n_sin_xml)."""
+    """Lee Odoo, descarga XML y concilia retenciones. Devuelve (ret, desde, hasta, n_sin_xml, fallidos)."""
     con_fecha = sri_ret[sri_ret["fecha"].notna()]
     if con_fecha.empty:
         raise ValueError("El TXT de retenciones no tiene fechas de emisión válidas")
@@ -74,8 +74,8 @@ def _retenciones(job_id, sri_ret, lector):
     odoo_ret = lector.fetch_retenciones(fetch_desde, fetch_hasta)
 
     claves = list(sri_ret["clave"])
-    descargar_con_progreso(claves, descargar_xmls, CACHE_XML_DIR,
-                           lambda m, p: write_status(job_id, "running", m, p))
+    fallidos = descargar_con_progreso(claves, descargar_xmls, CACHE_XML_DIR,
+                                      lambda m, p: write_status(job_id, "running", m, p))
 
     lineas = lineas_sri(claves, CACHE_XML_DIR)
     # Sin líneas = no descargado o XML ilegible/vacío: todos terminan como "XML no disponible".
@@ -83,7 +83,7 @@ def _retenciones(job_id, sri_ret, lector):
 
     write_status(job_id, "running", "Conciliando retenciones...", 0.7)
     ret = conciliar_retenciones(lineas, odoo_ret, sri_ret, desde, hasta)
-    return ret, desde, hasta, n_sin_xml
+    return ret, desde, hasta, n_sin_xml, fallidos
 
 
 def run_pipeline_compras(job_id: str) -> None:
@@ -98,9 +98,9 @@ def run_pipeline_compras(job_id: str) -> None:
                              "ni retenciones")
         lector = OdooReader.from_env()  # una sola conexión para compras y retenciones
 
-        ret, n_sin_xml, periodo_ret = None, 0, None
+        ret, n_sin_xml, periodo_ret, fallidos = None, 0, None, []
         if not sri_ret.empty:
-            ret, ret_desde, ret_hasta, n_sin_xml = _retenciones(job_id, sri_ret, lector)
+            ret, ret_desde, ret_hasta, n_sin_xml, fallidos = _retenciones(job_id, sri_ret, lector)
             periodo_ret = (ret_desde, ret_hasta)
             desde, hasta = periodo_ret  # solo retenciones: hojas de compras con este período
 
@@ -121,6 +121,9 @@ def run_pipeline_compras(job_id: str) -> None:
                 resumen["advertencias"].append(
                     f"{n_sin_xml} XML de retenciones no se pudieron descargar o leer; sus retenciones "
                     "se listan como 'XML no disponible'")
+                if fallidos:
+                    resumen["advertencias"].append(
+                        f"Motivo de las descargas fallidas: {resumir_motivos(fallidos)}")
         write_status(job_id, "done", "Completado", 1.0, resumen=resumen)
         schedule_cleanup(job_id, delay_seconds=7200)
     except Exception as exc:
