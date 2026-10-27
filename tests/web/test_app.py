@@ -390,10 +390,25 @@ def test_index_menciona_retenciones_en_compras(client):
     assert "cualquier subconjunto" in html
 
 
-def test_index_ventas_informativo_de_retenciones_es_neutro(client):
-    import re
-    from app.retenciones.conciliar_retenciones import EST_INFO
+def test_index_trae_las_dos_pestanas(client):
     cookies = _login(client)
     html = client.get("/", cookies=cookies).text
-    neutros = re.search(r"const neutros = new Set\(\[(.*?)\]\);", html).group(1)
-    assert f'"{EST_INFO}"' in neutros
+    assert 'id="tab-compras"' in html and 'id="tab-ventas"' in html
+    assert "form-retenciones" not in html
+    assert '/static/tablero.js' in html and '/static/tablero.css' in html
+    js = client.get("/static/tablero.js")  # estáticos públicos; la página sigue exigiendo login
+    assert js.status_code == 200 and "javascript" in js.headers["content-type"]
+    css = client.get("/static/tablero.css")
+    assert css.status_code == 200 and "text/css" in css.headers["content-type"]
+    assert client.get("/static/../main.py").status_code == 404
+
+
+def test_tablero_js_atenua_informativos_de_ambos_modos(client):
+    """Las filas Informativo* se atenúan por prefijo: cubre el de Ventas y el de retenciones."""
+    from app.retenciones.conciliar_retenciones import EST_INFO as INFO_RET
+    from app.ventas.conciliar_emitidos import EST_INFO as INFO_VEN
+    js = client.get("/static/tablero.js").text
+    assert 'startsWith("Informativo")' in js
+    assert INFO_RET.startswith("Informativo") and INFO_VEN.startswith("Informativo")
+    for ruta in ("/sesion", "/conciliar", "/status/", "/tablero/", "/download/", "esc("):
+        assert ruta in js

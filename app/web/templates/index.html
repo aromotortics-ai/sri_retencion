@@ -4,281 +4,71 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Conciliación SRI</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; background: #f4f6f9; display: flex;
-           justify-content: center; align-items: center; min-height: 100vh; padding: 1rem; }
-    .card { background: white; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,.1);
-            padding: 2rem; width: 100%; max-width: 520px; }
-    h1 { color: #1F4E78; font-size: 1.3rem; margin-bottom: 0.25rem; }
-    .subtitle { color: #666; font-size: 0.85rem; margin-bottom: 1.5rem; }
-    .field { margin-bottom: 1rem; }
-    label { display: block; font-size: 0.85rem; color: #444; margin-bottom: 0.4rem; font-weight: bold; }
-    input[type=file] { width: 100%; border: 1px solid #ccc; border-radius: 4px;
-                       padding: 0.5rem; font-size: 0.85rem; cursor: pointer; }
-    button { width: 100%; padding: 0.75rem; background: #1F4E78; color: white;
-             border: none; border-radius: 4px; font-size: 1rem; cursor: pointer;
-             margin-top: 0.5rem; transition: background .2s; }
-    button:hover { background: #163d5f; }
-    button:disabled { background: #999; cursor: not-allowed; }
-    .progress-section { display: none; }
-    .status-msg { color: #444; font-size: 0.9rem; margin-bottom: 0.75rem; min-height: 1.2em; }
-    .bar-bg { background: #e0e7ef; border-radius: 4px; height: 12px; overflow: hidden; }
-    .bar-fill { background: #1F4E78; height: 100%; width: 0%; transition: width .4s ease;
-                border-radius: 4px; }
-    .elapsed { font-size: 0.78rem; color: #888; margin-top: 0.4rem; }
-    .result-section { display: none; }
-    .result-title { font-size: 1.1rem; color: #1a7a3c; font-weight: bold; margin-bottom: 1rem; }
-    .stat-grid { display: grid; grid-template-columns: 1fr auto; gap: 0.3rem 1rem;
-                 font-size: 0.88rem; margin-bottom: 1.25rem; }
-    .stat-label { color: #555; }
-    .stat-value { text-align: right; font-weight: bold; }
-    .stat-value.warn { color: #c0392b; }
-    .stat-value.ok { color: #1a7a3c; }
-    .btn-download { background: #1a7a3c; }
-    .btn-download:hover { background: #145c2d; }
-    .error-section { display: none; }
-    .error-title { color: #c0392b; font-weight: bold; margin-bottom: 0.75rem; }
-    .error-msg { background: #fdecea; border-radius: 4px; padding: 0.75rem;
-                 font-size: 0.82rem; color: #7b1c1c; white-space: pre-wrap;
-                 max-height: 120px; overflow-y: auto; margin-bottom: 1rem; }
-    .btn-retry { background: #888; }
-    .btn-retry:hover { background: #666; }
-    .tabs { display: flex; gap: .25rem; border-bottom: 2px solid #e0e7ef; margin-bottom: 1.25rem; }
-    .tab { width: auto; margin: 0; padding: .5rem 1rem; background: none; color: #666;
-           border-radius: 4px 4px 0 0; font-size: .9rem; }
-    .tab:hover { background: #eef2f7; }
-    .tab.active { color: #1F4E78; font-weight: bold; border-bottom: 3px solid #1F4E78; margin-bottom: -2px; }
-    .stat-sub { grid-column: 1 / -1; font-weight: bold; color: #1F4E78; margin-top: .5rem;
-                border-bottom: 1px solid #e0e7ef; }
-    .stat-note { grid-column: 1 / -1; font-size: .8rem; color: #7a5b00; background: #fff6dd;
-                 border-radius: 4px; padding: .4rem .6rem; }
-    .file-count { font-size: .78rem; color: #666; margin-top: .3rem; }
-  </style>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/static/tablero.css">
 </head>
 <body>
-<div class="card">
-  <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.25rem;">
+<header class="barra">
+  <div class="barra-in">
     <h1>Conciliación SRI</h1>
-    <a href="/logout" style="font-size:0.78rem;color:#888;text-decoration:none;" title="Cerrar sesión">Salir</a>
+    <nav class="tabs" role="tablist">
+      <button class="tab active" id="tab-compras" data-modo="compras" role="tab">Compras <small>recibidos</small></button>
+      <button class="tab" id="tab-ventas" data-modo="ventas" role="tab">Ventas <small>emitidos</small></button>
+    </nav>
+    <div class="barra-acc">
+      <button class="btn-sec" id="btn-nueva" title="Descarta los TXT y el resultado de esta pestaña">Nueva conciliación</button>
+      <a href="/logout" class="salir" title="Cerrar sesión">Salir</a>
+    </div>
   </div>
-  <p class="subtitle" id="subtitle">Sube los archivos y descarga el Excel de conciliación.</p>
-  <div class="tabs">
-    <button class="tab" id="tab-ventas" onclick="setMode('ventas')">Ventas</button>
-    <button class="tab active" id="tab-compras" onclick="setMode('compras')">Compras</button>
-  </div>
+</header>
 
-  <!-- Formulario -->
-  <div id="form-section">
-    <div id="form-ventas" style="display:none;">
-      <div class="field">
-        <label>TXT del portal SRI (comprobantes emitidos)</label>
-        <input type="file" id="emitidos-files" accept=".txt" multiple>
-        <p class="file-count" id="emitidos-count">Sube todos los TXT de emitidos de la semana (facturas, notas de crédito, notas de débito, liquidaciones y retenciones). Odoo se lee automáticamente.</p>
+<main>
+  <section class="carga">
+    <label class="drop" id="drop" tabindex="0">
+      <input type="file" id="input-txt" accept=".txt,text/plain" multiple hidden>
+      <strong>Suelta aquí los TXT del portal SRI</strong>
+      <span>o haz clic para seleccionarlos</span>
+      <p class="hint" id="hint-compras">Comprobantes recibidos. Hasta 5 archivos: facturas, notas de crédito, notas de débito y retenciones; puedes subirlos juntos o cualquier subconjunto. Los datos de Odoo se leen automáticamente.</p>
+      <p class="hint" id="hint-ventas" hidden>Comprobantes emitidos. Hasta 400 TXT de la semana (facturas, notas de crédito, notas de débito, liquidaciones y retenciones), con cualquier nombre. Odoo se lee automáticamente.</p>
+    </label>
+    <div class="archivos">
+      <div class="archivos-cab"><h2>Archivos cargados</h2><span id="archivos-cuenta"></span></div>
+      <ul id="lista-archivos" class="lista"></ul>
+    </div>
+  </section>
+
+  <div id="avisos"></div>
+
+  <section class="resultado">
+    <div class="res-cab">
+      <h2>Resultado</h2>
+      <span id="periodo" class="periodo"></span>
+      <span id="actualizando" class="actualizando" hidden><i class="spin"></i><span id="act-msg">Actualizando…</span></span>
+    </div>
+    <div id="advertencias"></div>
+    <div id="tarjetas" class="tarjetas"></div>
+  </section>
+
+  <section class="excepciones" id="sec-excepciones">
+    <div class="exc-cab">
+      <h2>Excepciones</h2>
+      <div class="descargas">
+        <button id="btn-obs" class="btn-pri" disabled>Descargar observaciones (Excel)</button>
+        <button id="btn-completo" class="btn-sec" disabled>Descargar Excel completo</button>
       </div>
     </div>
-    <div id="form-compras">
-      <div class="field">
-        <label>TXT del portal SRI (comprobantes recibidos)</label>
-        <input type="file" id="compras-files" accept=".txt" multiple>
-        <p class="file-count" id="compras-count">Hasta 5 archivos: facturas, notas de crédito, notas de débito y retenciones; puedes subirlos juntos o cualquier subconjunto. Los datos de Odoo se leen automáticamente.</p>
+    <div class="filtros">
+      <div id="chips-estado" class="chips"></div>
+      <div class="filtros-der">
+        <select id="f-tipo" aria-label="Filtrar por tipo"></select>
+        <input type="search" id="f-buscar" placeholder="Buscar documento, contraparte o RUC" aria-label="Buscar">
+        <label class="toggle"><input type="checkbox" id="f-info"> Informativos <span id="info-cuenta"></span></label>
       </div>
     </div>
-    <button id="btn-procesar" onclick="startJob()">Procesar</button>
-  </div>
+    <div id="tabla" class="tabla-wrap"></div>
+  </section>
+</main>
 
-  <!-- Progreso -->
-  <div class="progress-section" id="progress-section">
-    <p class="status-msg" id="status-msg">Iniciando...</p>
-    <div class="bar-bg"><div class="bar-fill" id="bar-fill"></div></div>
-    <p class="elapsed" id="elapsed"></p>
-  </div>
-
-  <!-- Resultado -->
-  <div class="result-section" id="result-section">
-    <p class="result-title">&#x2705; Listo</p>
-    <div class="stat-grid" id="stat-grid"></div>
-    <button class="btn-download" id="btn-download">&#x2B07; Descargar Excel</button>
-    <button class="btn-retry" onclick="reset()" style="margin-top:.5rem;">Procesar otro período</button>
-  </div>
-
-  <!-- Error -->
-  <div class="error-section" id="error-section">
-    <p class="error-title">&#x274C; Error al procesar</p>
-    <div class="error-msg" id="error-msg"></div>
-    <button class="btn-retry" onclick="reset()">Intentar de nuevo</button>
-  </div>
-</div>
-
-<script>
-  let pollInterval = null;
-  let startTime   = null;
-  let currentJobId = null;
-  let mode = "compras";
-
-  function setMode(m) {
-    mode = m;
-    ["ventas","compras"].forEach(k => {
-      document.getElementById("tab-" + k).classList.toggle("active", k === m);
-      document.getElementById("form-" + k).style.display = k === m ? "block" : "none";
-    });
-    reset();
-  }
-
-  document.addEventListener("DOMContentLoaded", () => {
-    document.getElementById("compras-files").addEventListener("change", e => {
-      const n = e.target.files.length;
-      document.getElementById("compras-count").textContent =
-        n ? `${n} archivo${n === 1 ? "" : "s"} seleccionado${n === 1 ? "" : "s"}` : "";
-    });
-    document.getElementById("emitidos-files").addEventListener("change", e => {
-      const n = e.target.files.length;
-      document.getElementById("emitidos-count").textContent =
-        n ? `${n} archivo${n === 1 ? "" : "s"} seleccionado${n === 1 ? "" : "s"}` : "";
-    });
-  });
-
-  function show(id) {
-    ["form-section","progress-section","result-section","error-section"]
-      .forEach(s => document.getElementById(s).style.display = s === id ? "block" : "none");
-  }
-
-  async function startJob() {
-    const fd = new FormData();
-    let url;
-    if (mode === "compras") {
-      const txts = document.getElementById("compras-files").files;
-      if (!txts.length) { alert("Selecciona los TXT del SRI."); return; }
-      if (txts.length > 5) { alert("Máximo 5 archivos."); return; }
-      for (const f of txts) fd.append("sri", f);
-      url = "/upload-compras";
-    } else {
-      const txts = document.getElementById("emitidos-files").files;
-      if (!txts.length) { alert("Selecciona los TXT del SRI."); return; }
-      if (txts.length > 400) { alert("Máximo 400 archivos."); return; }
-      for (const f of txts) fd.append("emitidos", f);
-      url = "/upload-ventas";
-    }
-    document.getElementById("btn-procesar").disabled = true;
-
-    try {
-      const r = await fetch(url, { method: "POST", body: fd });
-      if (r.status === 401) { location = "/login"; return; }
-      if (!r.ok) { throw new Error(`HTTP ${r.status}`); }
-      const { job_id } = await r.json();
-      currentJobId = job_id;
-      startTime = Date.now();
-      show("progress-section");
-      pollInterval = setInterval(() => poll(job_id), 5000);
-      poll(job_id);
-    } catch(e) {
-      alert("Error al subir archivos: " + e.message);
-      document.getElementById("btn-procesar").disabled = false;
-    }
-  }
-
-  async function poll(job_id) {
-    try {
-      const r = await fetch(`/status/${job_id}`);
-      if (r.status === 401) { clearInterval(pollInterval); location = "/login"; return; }
-      if (!r.ok) return;
-      const data = await r.json();
-
-      document.getElementById("status-msg").textContent = data.mensaje || "";
-      document.getElementById("bar-fill").style.width = ((data.progreso || 0) * 100) + "%";
-
-      const elapsed = Math.round((Date.now() - startTime) / 1000);
-      const m = Math.floor(elapsed / 60), s = elapsed % 60;
-      document.getElementById("elapsed").textContent =
-        `Tiempo transcurrido: ${m}m ${String(s).padStart(2,"0")}s`;
-
-      if (data.estado === "done") {
-        clearInterval(pollInterval);
-        showResult(job_id, data.resumen);
-      } else if (data.estado === "error") {
-        clearInterval(pollInterval);
-        showError(data.mensaje || "Error desconocido");
-      }
-    } catch(e) { /* red temporalmente caída — reintentar en el siguiente tick */ }
-  }
-
-  function showResult(job_id, resumen) {
-    show("result-section");
-    if (mode === "compras") showResultCompras(job_id, resumen);
-    else showResultVentas(job_id, resumen);
-  }
-
-  function esc(t) {
-    return String(t).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-  }
-
-  function showResultCompras(job_id, resumen) {
-    const nombres = { FAC: "Facturas", NC: "Notas de crédito", ND: "Notas de débito",
-                      retenciones: "Retenciones (documentos)" };
-    const filas = [["coinciden","Coinciden",0],["diferencias","Diferencias de valor",1],
-                   ["solo_sri","Solo en SRI · falta en Odoo",1],["solo_odoo","Solo en Odoo · revisar",1],
-                   ["informativos","Informativos (no aplica)",0]];
-    // Las retenciones cuentan DOCUMENTOS (un comprobante con varias líneas = 1), usan "diferencia"
-    // (singular) y añaden "factura_incorrecta" y las líneas de detalle.
-    const filasRet = [["coinciden","Coinciden",0],["diferencia","Diferencias de valor",1],
-                      ["solo_sri","Solo en SRI · falta en Odoo",1],["solo_odoo","Solo en Odoo · revisar",1],
-                      ["factura_incorrecta","Factura incorrecta en Odoo",1],
-                      ["informativos","Informativos (no aplica)",0],
-                      ["lineas","Líneas de detalle (Ret_Conciliacion)",0]];
-    let html = "";
-    for (const [tipo, c] of Object.entries(resumen.por_tipo || {})) {
-      html += `<span class="stat-sub">${nombres[tipo] || esc(tipo)}</span>`;
-      html += (tipo === "retenciones" ? filasRet : filas).map(([k, label, aviso]) =>
-        `<span class="stat-label">${label}</span>` +
-        `<span class="stat-value ${k === "coinciden" ? "ok" : (aviso ? (c[k] > 0 ? "warn" : "ok") : "")}">${c[k] ?? "&#x2014;"}</span>`
-      ).join("");
-    }
-    html += (resumen.advertencias || []).map(a => `<span class="stat-note">&#x26A0; ${esc(a)}</span>`).join("");
-    document.getElementById("stat-grid").innerHTML = html;
-    document.getElementById("btn-download").onclick = () => { window.location = `/download/${job_id}`; };
-  }
-
-  function showResultVentas(job_id, resumen) {
-    const nombres = { FAC: "Facturas", NC: "Notas de crédito", ND: "Notas de débito",
-                      LIQ: "Liquidaciones", RET: "Retenciones" };
-    // Estados que no son problema; el resto se marca como aviso si es > 0.
-    const neutros = new Set(["Coincide", "Informativo", "Informativos", "Informativo (Odoo cancelada/borrador)"]);
-    const [d, h] = resumen.periodo || [];
-    let html = d ? `<span class="stat-note">Período: ${esc(d)} a ${esc(h)}</span>` : "";
-    for (const tipo of ["FAC", "NC", "ND", "LIQ", "RET"]) {
-      const c = (resumen.por_tipo || {})[tipo];
-      const n = (resumen.comprobantes_sri || {})[tipo] ?? 0;
-      if (!c && !n) continue;
-      html += `<span class="stat-sub">${nombres[tipo]} (${esc(n)} en SRI)</span>`;
-      html += Object.entries(c || {}).filter(([k]) => k !== "total").map(([k, v]) =>
-        `<span class="stat-label">${esc(k)}</span>` +
-        `<span class="stat-value ${k === "Coincide" ? "ok" : (neutros.has(k) ? "" : (v > 0 ? "warn" : "ok"))}">${esc(v)}</span>`
-      ).join("");
-    }
-    if (resumen.retenciones_fallidos > 0) {
-      html += `<span class="stat-note">&#x26A0; ${esc(resumen.retenciones_fallidos)} retenciones sin XML disponible</span>`;
-    }
-    html += (resumen.advertencias || []).map(a => `<span class="stat-note">&#x26A0; ${esc(a)}</span>`).join("");
-    document.getElementById("stat-grid").innerHTML = html;
-    document.getElementById("btn-download").onclick = () => { window.location = `/download/${job_id}`; };
-  }
-
-  function showError(msg) {
-    show("error-section");
-    document.getElementById("error-msg").textContent = msg;
-  }
-
-  function reset() {
-    clearInterval(pollInterval);
-    currentJobId = null;
-    document.getElementById("emitidos-files").value = "";
-    document.getElementById("compras-files").value = "";
-    document.getElementById("emitidos-count").textContent =
-      "Sube todos los TXT de emitidos de la semana (facturas, notas de crédito, notas de débito, liquidaciones y retenciones). Odoo se lee automáticamente.";
-    document.getElementById("btn-procesar").disabled = false;
-    document.getElementById("bar-fill").style.width = "0%";
-    show("form-section");
-  }
-</script>
+<script src="/static/tablero.js"></script>
 </body>
 </html>

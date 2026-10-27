@@ -1,6 +1,6 @@
 """
 Aplicación FastAPI de la conciliación SRI vs Odoo (tablero en vivo).
-Endpoints: GET/POST /login, GET /logout, GET /,
+Endpoints: GET/POST /login, GET /logout, GET / (tablero; CSS/JS públicos en /static),
 sesión de trabajo: POST /sesion {modo}, POST /sesion/{id}/txt (campo `archivos`),
 DELETE /sesion/{id}/txt/{nombre}, POST /sesion/{id}/conciliar,
 resultado: GET /status/{id}, GET /tablero/{id}, GET /download/{id}?tipo=completo|observaciones
@@ -18,6 +18,7 @@ from typing import Literal
 from fastapi import FastAPI, Depends, HTTPException, Request, UploadFile, File
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from itsdangerous import TimestampSigner, BadSignature, SignatureExpired
 
@@ -27,6 +28,7 @@ from app import sesion
 from app.job_manager import read_status, get_job_dir, mark_stale_jobs_as_error
 
 TEMPLATES_DIR  = Path(__file__).parent / "templates"
+STATIC_DIR     = Path(__file__).parent / "static"
 USERS_FILE     = str(DATA_DIR / "users.yaml")
 TEMPLATE       = TEMPLATES_DIR / "index.html"
 LOGIN_TEMPLATE = TEMPLATES_DIR / "login.html"
@@ -71,6 +73,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Conciliación SRI", docs_url=None, redoc_url=None, lifespan=lifespan)
+# CSS/JS del tablero: públicos y sin datos (la página `/` sigue exigiendo login).
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
 # ── Autenticación ──────────────────────────────────────────────────────────────
