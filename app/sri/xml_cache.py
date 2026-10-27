@@ -31,7 +31,7 @@ COLUMNAS = ["clave", "n_ret", "fecha", "ruc", "proveedor",
 
 
 def formatear_doc(v):
-    """Num. de documento 3-3-9 con guiones (misma regla que build_workbook_final)."""
+    """Num. de documento 3-3-9 con guiones (mismo formato que usa el SRI en N° de retención y factura)."""
     if isinstance(v, str) and "-" not in v and len(v) >= 6:
         return f"{v[:3]}-{v[3:6]}-{v[6:]}"
     return v

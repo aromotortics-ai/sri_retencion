@@ -1,10 +1,7 @@
 import pytest
 import bcrypt
 import yaml
-from pathlib import Path
 from fastapi.testclient import TestClient
-
-FIXTURES = Path(__file__).parent.parent
 
 
 @pytest.fixture

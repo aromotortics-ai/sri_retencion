@@ -3,9 +3,9 @@
 CLI para administrar usuarios en users.yaml.
 
 Uso:
-    python setup_usuario.py add <username>          # añadir o actualizar usuario
-    python setup_usuario.py remove <username>       # eliminar usuario
-    python setup_usuario.py list                    # listar usuarios
+    python scripts/setup_usuario.py add <username>          # añadir o actualizar usuario
+    python scripts/setup_usuario.py remove <username>       # eliminar usuario
+    python scripts/setup_usuario.py list                    # listar usuarios
 """
 import sys
 import getpass
@@ -83,7 +83,7 @@ def main():
         cmd_list()
     elif cmd in ("add", "remove"):
         if len(sys.argv) < 3:
-            print(f"Uso: python setup_usuario.py {cmd} <username>")
+            print(f"Uso: python scripts/setup_usuario.py {cmd} <username>")
             sys.exit(1)
         if cmd == "add":
             cmd_add(sys.argv[2])

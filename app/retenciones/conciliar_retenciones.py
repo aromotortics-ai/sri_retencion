@@ -2,7 +2,7 @@
 """Conciliacion de retenciones RECIBIDAS: lineas del SRI (XML) vs lineas de Odoo (API).
 
 Logica pura sobre DataFrames. Clave de cruce: (N° retencion, factura sustento, porcentaje),
-tolerancia de $0.02 en el valor retenido (misma regla que conciliar_odoo.py), mas dos pasadas
+tolerancia de $0.02 en el valor retenido (misma regla que el CLI scripts/conciliar_recibidas.py), mas dos pasadas
 sobre lo que queda sin pareja: factura incorrecta y porcentaje distinto.
 """
 import pandas as pd
