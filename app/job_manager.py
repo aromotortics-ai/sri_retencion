@@ -7,6 +7,7 @@ import json
 import uuid
 import shutil
 import threading
+import time
 from datetime import datetime, UTC
 from pathlib import Path
 
@@ -70,10 +71,26 @@ def read_status(job_id: str) -> dict | None:
         return None
 
 
+def _ultima_actividad(job_dir: Path) -> float | None:
+    """Marca de tiempo (epoch) de la última actividad de una sesión de trabajo, o None si el job
+    no es una sesión (sin sesion.json o sin el campo)."""
+    try:
+        return float(json.loads((job_dir / "sesion.json").read_text(encoding="utf-8"))["ultima_actividad"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
 def schedule_cleanup(job_id: str, delay_seconds: int = 7200) -> None:
-    """Programa la eliminación del job tras delay_seconds (default 2 horas)."""
+    """Programa la eliminación del job tras delay_seconds (default 2 horas).
+
+    En una sesión de trabajo (sesion.json con `ultima_actividad`) cada actividad agenda un timer
+    nuevo; un timer viejo no borra si hubo actividad hace menos de delay_seconds (lo hará el timer
+    agendado por esa actividad). Los jobs sin sesion.json se borran como siempre."""
     def _cleanup():
         job_dir = get_job_dir(job_id)
+        ultima = _ultima_actividad(job_dir)
+        if ultima is not None and time.time() - ultima < delay_seconds - 1:
+            return
         if job_dir.exists():
             shutil.rmtree(job_dir, ignore_errors=True)
 

@@ -1,7 +1,8 @@
 """
 Runner del pipeline de conciliación de compras (comprobantes recibidos SRI vs Odoo por API).
-Incluye las retenciones recibidas cuando se carga su TXT. Se ejecuta en un hilo background
-lanzado por app.py.
+Incluye las retenciones recibidas cuando se carga su TXT. `procesar_compras` es el cuerpo común
+(lo usan la sesión de trabajo y el flujo de un solo envío `run_pipeline_compras`); corre en un hilo
+background.
 """
 import calendar
 import traceback
@@ -9,10 +10,13 @@ from datetime import date
 
 import pandas as pd
 
-from app.compras.conciliar_compras import conciliar_compras, leer_sri_txts
-from app.retenciones.conciliar_retenciones import conciliar_retenciones, leer_sri_retenciones_txt
+from app.compras.clasificar import clasificar_compras
+from app.compras.conciliar_compras import conciliar_y_excel, leer_sri_txts
+from app.retenciones.conciliar_retenciones import (conciliar_retenciones, leer_sri_retenciones_txt,
+                                                   resumir_por_documento)
 from app.job_manager import write_status, schedule_cleanup, get_job_dir
 from app.odoo.client import COLUMNAS as COLUMNAS_ODOO_COMPRAS, OdooReader
+from app.reportes.tablero import construir_tablero
 from app.sri.xml_cache import descargar_xmls, lineas_sri, resumir_motivos
 
 from app.rutas import CACHE_XML_DIR  # caché de XML compartido entre jobs
@@ -60,7 +64,11 @@ def descargar_con_progreso(claves, descargar, cache_dir, avisar):
     return fallidos
 
 
-def _retenciones(job_id, sri_ret, lector):
+def _sin_cancelar():
+    """Punto de control nulo (sin sesión: nada puede superar la corrida)."""
+
+
+def _retenciones(sri_ret, lector, avisar, cancelado):
     """Lee Odoo, descarga XML y concilia retenciones. Devuelve (ret, desde, hasta, n_sin_xml, fallidos)."""
     con_fecha = sri_ret[sri_ret["fecha"].notna()]
     if con_fecha.empty:
@@ -68,60 +76,85 @@ def _retenciones(job_id, sri_ret, lector):
     desde, hasta, fetch_desde, fetch_hasta = periodo_sri(con_fecha)
 
     # Odoo primero: credenciales erróneas u Odoo caído fallan de inmediato, no tras la descarga.
-    write_status(job_id, "running", "Leyendo retenciones de Odoo...", 0.12)
+    avisar("Leyendo retenciones de Odoo...", 0.12)
     odoo_ret = lector.fetch_retenciones(fetch_desde, fetch_hasta)
+    cancelado()
 
     claves = list(sri_ret["clave"])
-    fallidos = descargar_con_progreso(claves, descargar_xmls, CACHE_XML_DIR,
-                                      lambda m, p: write_status(job_id, "running", m, p))
+    fallidos = descargar_con_progreso(claves, descargar_xmls, CACHE_XML_DIR, avisar)
+    cancelado()
 
     lineas = lineas_sri(claves, CACHE_XML_DIR)
     # Sin líneas = no descargado o XML ilegible/vacío: todos terminan como "XML no disponible".
     n_sin_xml = len(set(claves) - set(lineas["clave"]))
 
-    write_status(job_id, "running", "Conciliando retenciones...", 0.7)
+    avisar("Conciliando retenciones...", 0.7)
     ret = conciliar_retenciones(lineas, odoo_ret, sri_ret, desde, hasta)
     return ret, desde, hasta, n_sin_xml, fallidos
 
 
+def procesar_compras(rutas, salida, avisar, cancelado=None, advertencias=None):
+    """Concilia los TXT `rutas` contra Odoo, escribe el Excel completo en `salida` y devuelve
+    (resumen, tablero).
+
+    avisar(mensaje, progreso): informa el avance. cancelado(): punto de control que lanza una
+    excepción si la corrida fue superada (se llama tras leer los TXT, tras cada lectura de Odoo,
+    tras la descarga de XML y antes de escribir). advertencias: se anteponen a las del resultado
+    (p. ej. TXT excluidos por ilegibles)."""
+    cancelado = cancelado or _sin_cancelar
+    avisar("Leyendo TXT del SRI...", 0.1)
+    sri = leer_sri_txts(rutas)
+    sri_ret = leer_sri_retenciones_txt(rutas)
+    if sri.empty and sri_ret.empty:
+        raise ValueError("Los TXT no contienen facturas, notas de crédito, notas de débito "
+                         "ni retenciones")
+    cancelado()
+    lector = OdooReader.from_env()  # una sola conexión para compras y retenciones
+
+    ret, n_sin_xml, periodo_ret, fallidos = None, 0, None, []
+    if not sri_ret.empty:
+        ret, ret_desde, ret_hasta, n_sin_xml, fallidos = _retenciones(sri_ret, lector, avisar, cancelado)
+        periodo_ret = (ret_desde, ret_hasta)
+        desde, hasta = periodo_ret  # solo retenciones: hojas de compras con este período
+
+    if not sri.empty:
+        desde, hasta, fetch_desde, fetch_hasta = periodo_sri(sri)
+        avisar("Leyendo compras de Odoo...", 0.75)
+        odoo = lector.fetch_compras(fetch_desde, fetch_hasta)
+        cancelado()
+    else:
+        # Solo retenciones: hojas de compras vacías con el período de las retenciones.
+        odoo = pd.DataFrame(columns=COLUMNAS_ODOO_COMPRAS)
+
+    avisar("Conciliando SRI vs Odoo...", 0.85)
+    cancelado()
+    resumen, pares = conciliar_y_excel(sri, odoo, desde, hasta, salida, ret=ret, periodo_ret=periodo_ret)
+    resumen["advertencias"][:0] = list(advertencias or [])
+    if ret is not None:
+        resumen["retenciones_fallidos"] = n_sin_xml
+        if n_sin_xml:
+            resumen["advertencias"].append(
+                f"{n_sin_xml} XML de retenciones no se pudieron descargar o leer; sus retenciones "
+                "se listan como 'XML no disponible'")
+            if fallidos:
+                resumen["advertencias"].append(
+                    f"Motivo de las descargas fallidas: {resumir_motivos(fallidos)}")
+    # Mismos DataFrames (sin reindexar) que el Excel: pantalla y Excel salen del mismo cruce.
+    docs = clasificar_compras(sri, odoo, pares)
+    retdocs = resumir_por_documento(ret) if ret is not None else None
+    tablero = construir_tablero("compras", docs, sri, odoo, retdocs, (desde, hasta),
+                                resumen["advertencias"])
+    return resumen, tablero
+
+
 def run_pipeline_compras(job_id: str) -> None:
+    """Flujo de un solo envío (ruta POST /upload-compras): TXT en jobs/<id>/sri, resultado.xlsx y
+    status.json. Se retira junto con esa ruta; la sesión de trabajo usa procesar_compras."""
     job_dir = get_job_dir(job_id)
     try:
-        write_status(job_id, "running", "Leyendo TXT del SRI...", 0.1)
         rutas = sorted(str(p) for p in (job_dir / "sri").glob("*.txt"))
-        sri = leer_sri_txts(rutas)
-        sri_ret = leer_sri_retenciones_txt(rutas)
-        if sri.empty and sri_ret.empty:
-            raise ValueError("Los TXT no contienen facturas, notas de crédito, notas de débito "
-                             "ni retenciones")
-        lector = OdooReader.from_env()  # una sola conexión para compras y retenciones
-
-        ret, n_sin_xml, periodo_ret, fallidos = None, 0, None, []
-        if not sri_ret.empty:
-            ret, ret_desde, ret_hasta, n_sin_xml, fallidos = _retenciones(job_id, sri_ret, lector)
-            periodo_ret = (ret_desde, ret_hasta)
-            desde, hasta = periodo_ret  # solo retenciones: hojas de compras con este período
-
-        if not sri.empty:
-            desde, hasta, fetch_desde, fetch_hasta = periodo_sri(sri)
-            write_status(job_id, "running", "Leyendo compras de Odoo...", 0.75)
-            odoo = lector.fetch_compras(fetch_desde, fetch_hasta)
-        else:
-            # Solo retenciones: hojas de compras vacías con el período de las retenciones.
-            odoo = pd.DataFrame(columns=COLUMNAS_ODOO_COMPRAS)
-
-        write_status(job_id, "running", "Conciliando SRI vs Odoo...", 0.85)
-        resumen = conciliar_compras(rutas, odoo, desde, hasta, str(job_dir / "resultado.xlsx"),
-                                    ret=ret, periodo_ret=periodo_ret)
-        if ret is not None:
-            resumen["retenciones_fallidos"] = n_sin_xml
-            if n_sin_xml:
-                resumen["advertencias"].append(
-                    f"{n_sin_xml} XML de retenciones no se pudieron descargar o leer; sus retenciones "
-                    "se listan como 'XML no disponible'")
-                if fallidos:
-                    resumen["advertencias"].append(
-                        f"Motivo de las descargas fallidas: {resumir_motivos(fallidos)}")
+        resumen, _ = procesar_compras(rutas, str(job_dir / "resultado.xlsx"),
+                                      lambda m, p: write_status(job_id, "running", m, p))
         write_status(job_id, "done", "Completado", 1.0, resumen=resumen)
         schedule_cleanup(job_id, delay_seconds=7200)
     except Exception as exc:

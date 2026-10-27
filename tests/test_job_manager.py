@@ -51,3 +51,33 @@ def test_get_job_dir(tmp_path):
         job_id = create_job()
         d = get_job_dir(job_id)
     assert d == tmp_path / job_id
+
+
+def _esperar(cond, segundos=5.0):
+    limite = time.monotonic() + segundos
+    while time.monotonic() < limite:
+        if cond():
+            return True
+        time.sleep(0.02)
+    return cond()
+
+
+def test_cleanup_respeta_ultima_actividad_reciente(tmp_path):
+    from app.job_manager import create_job, get_job_dir, schedule_cleanup
+    with patch("app.job_manager.JOBS_DIR", tmp_path):
+        job_id = create_job()
+        (get_job_dir(job_id) / "sesion.json").write_text(
+            json.dumps({"ultima_actividad": time.time() + 60}), encoding="utf-8")
+        schedule_cleanup(job_id, delay_seconds=0.05)
+        time.sleep(0.3)
+        assert get_job_dir(job_id).exists()  # hubo actividad después: un timer posterior se encarga
+
+
+def test_cleanup_borra_si_la_actividad_es_vieja(tmp_path):
+    from app.job_manager import create_job, get_job_dir, schedule_cleanup
+    with patch("app.job_manager.JOBS_DIR", tmp_path):
+        job_id = create_job()
+        (get_job_dir(job_id) / "sesion.json").write_text(
+            json.dumps({"ultima_actividad": time.time() - 10}), encoding="utf-8")
+        schedule_cleanup(job_id, delay_seconds=0.05)
+        assert _esperar(lambda: not get_job_dir(job_id).exists())

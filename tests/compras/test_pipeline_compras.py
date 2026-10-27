@@ -28,7 +28,10 @@ class _Lector:
 
     def fetch_compras(self, desde, hasta, margen_dias=5):
         _Lector.llamado = (desde, hasta)
-        return pd.DataFrame()
+        return pd.DataFrame(columns=odoo_client.COLUMNAS)
+
+
+_PARES_VACIOS = pd.DataFrame(columns=["idx_sri", "id_odoo", "tipo", "metodo", "cat"])
 
 
 def test_pipeline_compras_ok(tmp_path, monkeypatch):
@@ -38,11 +41,11 @@ def test_pipeline_compras_ok(tmp_path, monkeypatch):
     monkeypatch.setattr(pc.OdooReader, "from_env", classmethod(lambda cls: _Lector()))
     visto = {}
 
-    def falso(rutas, odoo, desde, hasta, salida, ret=None, periodo_ret=None):
-        visto.update(rutas=rutas, desde=desde, hasta=hasta, salida=salida, ret=ret,
+    def falso(sri_df, odoo, desde, hasta, salida, ret=None, periodo_ret=None):
+        visto.update(sri=sri_df, desde=desde, hasta=hasta, salida=salida, ret=ret,
                      periodo_ret=periodo_ret)
-        return {"por_tipo": {"FAC": {"coinciden": 1}}, "advertencias": []}
-    monkeypatch.setattr(pc, "conciliar_compras", falso)
+        return {"por_tipo": {"FAC": {"coinciden": 1}}, "advertencias": []}, _PARES_VACIOS
+    monkeypatch.setattr(pc, "conciliar_y_excel", falso)
     (get_job_dir(job_id) / "sri" / "a.txt").write_text("x")
     pc.run_pipeline_compras(job_id)
     s = read_status(job_id)
@@ -52,6 +55,7 @@ def test_pipeline_compras_ok(tmp_path, monkeypatch):
     assert (visto["desde"], visto["hasta"]) == (date(2026, 9, 1), date(2026, 9, 30))
     assert visto["salida"].endswith("resultado.xlsx")
     assert visto["ret"] is None and visto["periodo_ret"] is None
+    assert visto["sri"] is sri  # el TXT se lee una sola vez
 
 
 def _sri(*fechas):
@@ -107,8 +111,9 @@ def test_pipeline_ventana_amplia_para_odoo_y_mes_dominante_para_conciliar(tmp_pa
     monkeypatch.setattr(pc, "leer_sri_txts", lambda rutas: _sri("2026-07-20", "2026-09-05", "2026-09-06"))
     monkeypatch.setattr(pc.OdooReader, "from_env", classmethod(lambda cls: _Lector()))
     visto = {}
-    monkeypatch.setattr(pc, "conciliar_compras",
-                        lambda r, o, d, h, s, ret=None, periodo_ret=None: visto.update(d=d, h=h) or {"por_tipo": {}, "advertencias": []})
+    monkeypatch.setattr(pc, "conciliar_y_excel",
+                        lambda sri, o, d, h, s, ret=None, periodo_ret=None:
+                        (visto.update(d=d, h=h) or {"por_tipo": {}, "advertencias": []}, _PARES_VACIOS))
     pc.run_pipeline_compras(job_id)
     assert read_status(job_id)["estado"] == "done"
     assert _Lector.llamado == (date(2026, 7, 20), date(2026, 9, 30))
@@ -535,3 +540,42 @@ def test_pipeline_rotula_periodo_de_retenciones(tmp_path, monkeypatch):
     assert rs[f"B{fila}"].value == "2026-08"
     textos = [c.value for row in rs.iter_rows() for c in row if isinstance(c.value, str)]
     assert any("08/2026" in t for t in textos)
+
+
+def test_procesar_compras_devuelve_tablero_con_las_mismas_cifras(tmp_path, monkeypatch):
+    pc, job_id, _, cache, _, _ = _entorno(
+        tmp_path, monkeypatch, {"fac.txt": [_fac()], "ret.txt": [_ret_txt(CLAVE_R1)]})
+    _xml(cache, CLAVE_R1)
+    rutas = sorted(str(p) for p in (get_job_dir(job_id) / "sri").glob("*.txt"))
+    resumen, tablero = pc.procesar_compras(rutas, str(tmp_path / "r.xlsx"), lambda m, p: None,
+                                           advertencias=["El archivo x.txt se excluyó"])
+    tarjetas = {t["tipo"]: t for t in tablero["tarjetas"]}
+    assert tarjetas["FAC"]["por_estado"] == {"Solo en SRI": resumen["por_tipo"]["FAC"]["solo_sri"]} == {
+        "Solo en SRI": 1}
+    assert tarjetas["RET"]["coinciden"] == resumen["por_tipo"]["retenciones"]["coinciden"] == 1
+    assert tablero["periodo"] == ["2026-09-01", "2026-09-30"]
+    assert resumen["advertencias"][0] == "El archivo x.txt se excluyó"
+    assert tablero["advertencias"] == resumen["advertencias"]
+    assert [e["documento"] for e in tablero["excepciones"]] == ["001-001-000000001"]
+    json.dumps(tablero)
+
+
+def test_procesar_compras_cancelado_antes_de_escribir(tmp_path, monkeypatch):
+    pc, job_id, lector, _, llamadas, _ = _entorno(tmp_path, monkeypatch, {"fac.txt": [_fac()]})
+    rutas = sorted(str(p) for p in (get_job_dir(job_id) / "sri").glob("*.txt"))
+
+    class Superado(Exception):
+        pass
+    puntos = []
+
+    def cancelado():
+        puntos.append(lector.compras)
+        if len(puntos) == 3:  # tras leer TXT, tras Odoo, antes de escribir
+            raise Superado
+    try:
+        pc.procesar_compras(rutas, str(tmp_path / "r.xlsx"), lambda m, p: None, cancelado=cancelado)
+        raise AssertionError("debió cancelarse")
+    except Superado:
+        pass
+    assert puntos[0] is None and puntos[1] is not None
+    assert not (tmp_path / "r.xlsx").exists()

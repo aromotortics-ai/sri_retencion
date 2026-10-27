@@ -348,3 +348,44 @@ def test_pipeline_con_error_agenda_limpieza(tmp_path, monkeypatch):
     assert s["estado"] == "error"
     assert s["error"]  # traceback
     assert llamadas == [((job_id,), {"delay_seconds": 7200})]
+
+
+def test_procesar_ventas_devuelve_tablero_con_las_mismas_cifras(tmp_path, monkeypatch):
+    lector = _Odoo(docs=[_doc_odoo(1, "FAC", "001-001-000000001", _clave(101))])
+    pv, job_id, _, cache, _ = _entorno(tmp_path, monkeypatch, _todos(), lector=lector)
+    _xml(cache, CLAVE_R1)
+    rutas = sorted(str(p) for p in (get_job_dir(job_id) / "emitidos").glob("*.txt"))
+    avisos = []
+    resumen, tablero = pv.procesar_ventas(rutas, str(tmp_path / "r.xlsx"), lambda m, p: avisos.append(m),
+                                          advertencias=["El archivo x.txt se excluyó"])
+    assert tablero["modo"] == "ventas" and tablero["periodo"] == resumen["periodo"]
+    tarjetas = {t["tipo"]: t for t in tablero["tarjetas"]}
+    for tipo in ("FAC", "NC", "LIQ", "RET"):
+        assert tarjetas[tipo]["total"] == resumen["por_tipo"][tipo]["total"]
+    assert tarjetas["FAC"]["coinciden"] == resumen["por_tipo"]["FAC"]["Coincide"] == 1
+    assert tarjetas["RET"]["coinciden"] == 1
+    assert resumen["advertencias"][0] == "El archivo x.txt se excluyó"
+    assert tablero["advertencias"] == resumen["advertencias"]
+    assert (tmp_path / "r.xlsx").exists() and avisos[0] == "Leyendo TXT del SRI..."
+    json.dumps(tablero)
+
+
+def test_procesar_ventas_cancelado_no_escribe_excel(tmp_path, monkeypatch):
+    pv, job_id, lector, _, llamadas = _entorno(tmp_path, monkeypatch, _todos())
+    rutas = sorted(str(p) for p in (get_job_dir(job_id) / "emitidos").glob("*.txt"))
+
+    class Superado(Exception):
+        pass
+    puntos = []
+
+    def cancelado():
+        puntos.append(list(lector.orden))
+        if lector.orden:  # superada tras la primera lectura de Odoo
+            raise Superado
+    try:
+        pv.procesar_ventas(rutas, str(tmp_path / "r.xlsx"), lambda m, p: None, cancelado=cancelado)
+        raise AssertionError("debió cancelarse")
+    except Superado:
+        pass
+    assert puntos == [[], ["fetch_emitidos"]]
+    assert llamadas == [] and not (tmp_path / "r.xlsx").exists()

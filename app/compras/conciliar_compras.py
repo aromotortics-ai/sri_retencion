@@ -179,8 +179,16 @@ def conciliar_compras(rutas_txt, odoo, desde, hasta, salida, ret=None, periodo_r
     ret: conciliación de retenciones ya calculada (DataFrame de conciliar_retenciones) o None si
     no se cargó TXT de retenciones; con ret, por_tipo incluye "retenciones".
     periodo_ret: (desde, hasta) de las retenciones, rotulado en el Resumen del Excel."""
+    return conciliar_y_excel(leer_sri_txts(rutas_txt), odoo, desde, hasta, salida,
+                             ret=ret, periodo_ret=periodo_ret)[0]
+
+
+def conciliar_y_excel(sri, odoo, desde, hasta, salida, ret=None, periodo_ret=None):
+    """Igual que `conciliar_compras` pero con el DataFrame del SRI ya leído (`leer_sri_txts`).
+
+    Devuelve (resumen, pares): `pares` es el cruce de `conciliar` usado en el Excel, con `idx_sri`
+    apuntando a las etiquetas de `sri` (para clasificar_compras / el tablero sin volver a cruzar)."""
     from app.compras.excel_compras import construir_excel  # import tardío: excel_compras importa este módulo
-    sri = leer_sri_txts(rutas_txt)
     pares = conciliar(sri, odoo, desde, hasta)
     por_tipo = construir_excel(sri, odoo, pares, desde, hasta, salida, ret=ret, periodo_ret=periodo_ret)
     advertencias = [f"Falta el TXT de {_NOMBRE_TIPO[t]}" for t in tipos_faltantes(sri)]
@@ -188,4 +196,4 @@ def conciliar_compras(rutas_txt, odoo, desde, hasta, salida, ret=None, periodo_r
         advertencias.append("Falta el TXT de retenciones")
     if not _recalcular(salida):
         advertencias.append("No se pudo recalcular con LibreOffice; Excel recalculará las fórmulas al abrir el archivo")
-    return {"por_tipo": por_tipo, "advertencias": advertencias}
+    return {"por_tipo": por_tipo, "advertencias": advertencias}, pares
