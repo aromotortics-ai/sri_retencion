@@ -227,7 +227,16 @@ def agregar_txt(sesion_id: str, nombre: str, contenido: bytes) -> dict:
 def agregar_txts(sesion_id: str, archivos: list[tuple[str, bytes]]) -> list[dict]:
     """Como agregar_txt para varios (nombre, contenido) de un mismo envío, pero reprograma la
     limpieza una sola vez al terminar (aunque falle a la mitad: lo ya guardado cuenta como
-    actividad). Si un archivo excede el límite lanza ValueError y los anteriores quedan guardados."""
+    actividad). La capacidad de TODO el lote se verifica antes de guardar nada: si no cabe lanza
+    ValueError y no se guarda ningún archivo (los repetidos dentro del lote o ya presentes son
+    reemplazos y no cuentan)."""
+    with _bloqueo(sesion_id):
+        ses = _leer_sesion(sesion_id)
+        modo = ses["modo"]
+        existentes = {a["nombre"] for a in ses["archivos"]}
+        nuevos = {_nombre_txt(n) for n, _ in archivos} - existentes
+        if len(existentes) + len(nuevos) > LIMITES[modo]:
+            raise ValueError(f"Se admiten como máximo {LIMITES[modo]} TXT en {modo}")
     entradas = []
     try:
         for nombre, contenido in archivos:
@@ -256,6 +265,10 @@ def listar_txt(sesion_id: str) -> list[dict]:
 def generacion_actual(sesion_id: str) -> int:
     """Generación solicitada más reciente (la que el cliente recibió de `solicitar_recalculo`)."""
     return int(_leer_sesion(sesion_id).get("generacion", 0))
+
+
+def modo_de(sesion_id: str) -> str:
+    return _leer_sesion(sesion_id)["modo"]
 
 
 def existe(sesion_id: str) -> bool:

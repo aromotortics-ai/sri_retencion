@@ -214,11 +214,58 @@ def test_limite_de_txt_da_400(entorno_sesion):
     sid = _crear(client, cookies)  # compras: máximo 5
     r = _subir(client, cookies, sid, *[(f"f{i}.txt", _txt(i + 1)) for i in range(5)])
     assert r.status_code == 200 and len(r.json()["archivos"]) == 5
+    antes = client.delete(f"/sesion/{sid}/txt/nada.txt", cookies=cookies).json()["archivos"]
     r = _subir(client, cookies, sid, ("f6.txt", _txt(9)))
     assert r.status_code == 400
     assert "5" in r.json()["detail"]
+    assert client.delete(f"/sesion/{sid}/txt/nada.txt", cookies=cookies).json()["archivos"] == antes
     # reemplazar uno existente sigue permitido
     assert _subir(client, cookies, sid, ("f0.txt", _txt(1, 2))).status_code == 200
+
+
+def test_lote_con_mas_archivos_que_el_limite_se_rechaza_antes_de_leer(entorno_sesion):
+    from test_sesion import _txt
+    client, cookies, _ = entorno_sesion
+    sid = _crear(client, cookies)
+    _subir(client, cookies, sid, ("a.txt", _txt(1)))
+    r = _subir(client, cookies, sid, *[(f"n{i}.txt", _txt(i + 2)) for i in range(6)])
+    assert r.status_code == 400
+    assert [a["nombre"] for a in client.delete(f"/sesion/{sid}/txt/nada.txt",
+                                               cookies=cookies).json()["archivos"]] == ["a.txt"]
+
+
+def test_lote_que_no_cabe_no_guarda_nada(entorno_sesion):
+    from test_sesion import _txt
+    client, cookies, _ = entorno_sesion
+    sid = _crear(client, cookies)
+    _subir(client, cookies, sid, *[(f"f{i}.txt", _txt(i + 1)) for i in range(4)])
+    r = _subir(client, cookies, sid, ("x.txt", _txt(7)), ("y.txt", _txt(8)))  # 4 + 2 > 5
+    assert r.status_code == 400
+    nombres = [a["nombre"] for a in client.delete(f"/sesion/{sid}/txt/nada.txt",
+                                                  cookies=cookies).json()["archivos"]]
+    assert nombres == [f"f{i}.txt" for i in range(4)]
+
+
+def test_reemplazo_dentro_de_un_lote_no_cuenta_contra_el_limite(entorno_sesion):
+    from test_sesion import _txt
+    client, cookies, _ = entorno_sesion
+    sid = _crear(client, cookies)
+    _subir(client, cookies, sid, *[(f"f{i}.txt", _txt(i + 1)) for i in range(4)])
+    # f0 ya existe (reemplazo) y z se repite dentro del lote (cuenta una vez): 4 + 1 = 5
+    r = _subir(client, cookies, sid, ("f0.txt", _txt(1, 2)), ("z.txt", _txt(5)),
+               ("z.TXT", _txt(7)))
+    assert r.status_code == 200, r.text
+
+
+def test_archivo_sobre_el_maximo_da_413(entorno_sesion, monkeypatch):
+    import app.web.main as app_module
+    client, cookies, _ = entorno_sesion
+    monkeypatch.setattr(app_module, "MAX_BYTES_TXT", 100)
+    sid = _crear(client, cookies)
+    assert _subir(client, cookies, sid, ("g.txt", b"x" * 101)).status_code == 413
+    assert _subir(client, cookies, sid, ("p.txt", b"x" * 50)).status_code == 200
+    monkeypatch.setattr(app_module, "MAX_BYTES_LOTE", 120)
+    assert _subir(client, cookies, sid, ("a.txt", b"x" * 80), ("b.txt", b"x" * 80)).status_code == 413
 
 
 def test_subida_masiva_programa_una_sola_limpieza(entorno_sesion):

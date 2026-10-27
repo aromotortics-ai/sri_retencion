@@ -122,6 +122,9 @@ _ID_RE = re.compile(r"[0-9a-f]{8}")  # formato de create_job: evita path travers
 _PUBLICADOS = {"tablero": "tablero.json", "completo": "resultado.xlsx",
                "observaciones": "observaciones.xlsx"}
 _DESCARGAS = {"completo": "Conciliacion_SRI.xlsx", "observaciones": "Observaciones_SRI.xlsx"}
+MAX_BYTES_TXT = 20 * 1024 * 1024    # por archivo (un TXT diario del portal pesa mucho menos)
+MAX_BYTES_LOTE = 200 * 1024 * 1024  # por solicitud
+_CHUNK = 1024 * 1024
 XLSX_MEDIA = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
@@ -155,7 +158,20 @@ async def subir_txt(
     nombres = [Path((f.filename or "").replace("\\", "/")).name for f in archivos]
     if any(not n.lower().endswith(".txt") for n in nombres):
         raise HTTPException(status_code=400, detail="Todos los archivos deben ser .txt")
-    lote = [(n, await f.read()) for n, f in zip(nombres, archivos)]
+    modo = sesion.modo_de(sesion_id)
+    if len(archivos) > sesion.LIMITES[modo]:  # primera barrera, antes de leer bytes
+        raise HTTPException(status_code=400,
+                            detail=f"Se admiten como máximo {sesion.LIMITES[modo]} TXT en {modo}")
+    lote, total = [], 0
+    for n, f in zip(nombres, archivos):
+        partes, tam = [], 0
+        while chunk := await f.read(_CHUNK):
+            tam += len(chunk)
+            total += len(chunk)
+            if tam > MAX_BYTES_TXT or total > MAX_BYTES_LOTE:
+                raise HTTPException(status_code=413, detail="Archivo o envío demasiado grande")
+            partes.append(chunk)
+        lote.append((n, b"".join(partes)))
     try:
         resultados = await run_in_threadpool(sesion.agregar_txts, sesion_id, lote)
     except ValueError as exc:
