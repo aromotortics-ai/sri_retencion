@@ -1,4 +1,23 @@
 """Helpers compartidos entre tests (importar como `from _helpers import ...`)."""
+import traceback
+
+from app.job_manager import get_job_dir, write_status
+
+
+def correr_pipeline(modulo, job_id, modo):
+    """Ejecuta `procesar_compras`/`procesar_ventas` de `modulo` sobre los TXT de la carpeta del job
+    (`sri/` o `emitidos/`) y deja status.json como lo hace la sesión (done/error). Reemplaza al
+    antiguo `run_pipeline_*`; los espías de estado parchean `_helpers.write_status`."""
+    job_dir = get_job_dir(job_id)
+    carpeta = "sri" if modo == "compras" else "emitidos"
+    procesar = getattr(modulo, f"procesar_{modo}")
+    try:
+        rutas = sorted(str(p) for p in (job_dir / carpeta).glob("*.txt"))
+        resumen, _ = procesar(rutas, str(job_dir / "resultado.xlsx"),
+                              lambda m, p: write_status(job_id, "running", m, p))
+        write_status(job_id, "done", "Completado", 1.0, resumen=resumen)
+    except Exception as exc:
+        write_status(job_id, "error", f"{type(exc).__name__}: {exc}", error=traceback.format_exc())
 
 
 def _autorizacion(clave, version, num_doc="001003000088766"):

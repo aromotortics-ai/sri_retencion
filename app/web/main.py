@@ -1,24 +1,30 @@
 """
-Aplicación FastAPI para el pipeline de conciliación SRI.
-Endpoints: GET/POST /login, GET /logout, GET /, POST /upload-ventas (emitidos), POST /upload-compras (recibidos),
-GET /status/{job_id}, GET /download/{job_id}
-Auth: cookie de sesión firmada con itsdangerous (SESSION_HOURS, default 8 h)
+Aplicación FastAPI de la conciliación SRI vs Odoo (tablero en vivo).
+Endpoints: GET/POST /login, GET /logout, GET /,
+sesión de trabajo: POST /sesion {modo}, POST /sesion/{id}/txt (campo `archivos`),
+DELETE /sesion/{id}/txt/{nombre}, POST /sesion/{id}/conciliar,
+resultado: GET /status/{id}, GET /tablero/{id}, GET /download/{id}?tipo=completo|observaciones
+Auth: cookie de sesión firmada con itsdangerous (SESSION_HOURS, default 8 h); las rutas de API
+responden 401 JSON sin sesión. Los ids de sesión son de 8 hex (create_job) y se validan antes de
+tocar el disco.
 """
 import os
+import re
 import secrets
-import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Literal
 
 from fastapi import FastAPI, Depends, HTTPException, Request, UploadFile, File
-from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
+from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from pydantic import BaseModel
 from itsdangerous import TimestampSigner, BadSignature, SignatureExpired
 
 from app.rutas import DATA_DIR
 from app.web.auth import verify_user
-from app.job_manager import create_job, read_status, get_job_dir, mark_stale_jobs_as_error
-from app.ventas.pipeline_ventas import run_pipeline_ventas
-from app.compras.pipeline_compras import run_pipeline_compras
+from app import sesion
+from app.job_manager import read_status, get_job_dir, mark_stale_jobs_as_error
 
 TEMPLATES_DIR  = Path(__file__).parent / "templates"
 USERS_FILE     = str(DATA_DIR / "users.yaml")
@@ -29,7 +35,6 @@ LOGIN_TEMPLATE = TEMPLATES_DIR / "login.html"
 # Si no se configura, se genera una nueva en cada arranque (invalida sesiones activas).
 SECRET_KEY    = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
 SESSION_HOURS = int(os.environ.get("SESSION_HOURS", "8"))
-MAX_TXT_VENTAS = 400  # TXT por envío en Ventas (un mes de TXT diarios de varios tipos cabe de sobra)
 COOKIE_NAME   = "sri_session"
 
 
@@ -49,26 +54,6 @@ def _verify_token(token: str) -> str | None:
 def _current_user(request: Request) -> str | None:
     token = request.cookies.get(COOKIE_NAME)
     return _verify_token(token) if token else None
-
-
-def _nombres_txt(archivos: list[UploadFile]) -> list[str]:
-    """Basename de cada archivo (evita path traversal); 400 si alguno no es .txt."""
-    nombres = [Path((f.filename or "").replace("\\", "/")).name for f in archivos]
-    if any(not n.lower().endswith(".txt") for n in nombres):
-        raise HTTPException(status_code=400, detail="Todos los archivos deben ser .txt")
-    return nombres
-
-
-async def _guardar_txts(archivos: list[UploadFile], nombres: list[str], carpeta: Path) -> None:
-    """Guarda los TXT con la extensión normalizada a `.txt` minúscula (los pipelines usan
-    glob("*.txt"), sensible a mayúsculas en Linux); un nombre repetido lleva prefijo numérico."""
-    carpeta.mkdir()
-    for i, (f, nombre) in enumerate(zip(archivos, nombres)):
-        nombre = Path(nombre).stem + ".txt"
-        dest = carpeta / nombre
-        if dest.exists():
-            dest = carpeta / f"{i}_{nombre}"
-        dest.write_bytes(await f.read())
 
 
 def require_session(request: Request) -> str:
@@ -133,37 +118,91 @@ def index(request: Request):
     return TEMPLATE.read_text(encoding="utf-8")
 
 
-@app.post("/upload-ventas")
-async def upload_ventas(
-    emitidos: list[UploadFile] = File(...),
+_ID_RE = re.compile(r"[0-9a-f]{8}")  # formato de create_job: evita path traversal
+_PUBLICADOS = {"tablero": "tablero.json", "completo": "resultado.xlsx",
+               "observaciones": "observaciones.xlsx"}
+_DESCARGAS = {"completo": "Conciliacion_SRI.xlsx", "observaciones": "Observaciones_SRI.xlsx"}
+XLSX_MEDIA = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+class NuevaSesion(BaseModel):
+    modo: Literal["compras", "ventas"]
+
+
+def _sesion_o_404(sesion_id: str) -> str:
+    """Valida el formato del id antes de tocar el disco y que la sesión exista."""
+    if not _ID_RE.fullmatch(sesion_id) or not sesion.existe(sesion_id):
+        raise HTTPException(status_code=404, detail="Sesión no encontrada o expirada")
+    return sesion_id
+
+
+def _ocupada(exc: TimeoutError) -> HTTPException:
+    return HTTPException(status_code=503, detail=str(exc))
+
+
+@app.post("/sesion")
+def crear_sesion(datos: NuevaSesion, _user: str = Depends(require_session)):
+    return {"sesion_id": sesion.crear_sesion(datos.modo)}
+
+
+@app.post("/sesion/{sesion_id}/txt")
+async def subir_txt(
+    sesion_id: str,
+    archivos: list[UploadFile] = File(...),
     _user: str = Depends(require_session),
 ):
-    if not 1 <= len(emitidos) <= MAX_TXT_VENTAS:
-        raise HTTPException(status_code=400,
-                            detail=f"Sube entre 1 y {MAX_TXT_VENTAS} archivos TXT del SRI")
-    nombres = _nombres_txt(emitidos)
+    _sesion_o_404(sesion_id)
+    nombres = [Path((f.filename or "").replace("\\", "/")).name for f in archivos]
+    if any(not n.lower().endswith(".txt") for n in nombres):
+        raise HTTPException(status_code=400, detail="Todos los archivos deben ser .txt")
+    lote = [(n, await f.read()) for n, f in zip(nombres, archivos)]
+    try:
+        resultados = await run_in_threadpool(sesion.agregar_txts, sesion_id, lote)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Sesión no encontrada o expirada")
+    except TimeoutError as exc:
+        raise _ocupada(exc)
+    # No recalcula: el cliente pide POST /sesion/{id}/conciliar cuando quiere.
+    return {"archivos": resultados, "generacion": sesion.generacion_actual(sesion_id)}
 
-    job_id = create_job()
-    await _guardar_txts(emitidos, nombres, get_job_dir(job_id) / "emitidos")
 
-    threading.Thread(target=run_pipeline_ventas, args=(job_id,), daemon=True).start()
-    return {"job_id": job_id}
+@app.delete("/sesion/{sesion_id}/txt/{nombre}")
+def quitar_txt(sesion_id: str, nombre: str, _user: str = Depends(require_session)):
+    _sesion_o_404(sesion_id)
+    try:
+        sesion.quitar_txt(sesion_id, nombre)
+        return {"archivos": sesion.listar_txt(sesion_id)}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Sesión no encontrada o expirada")
+    except TimeoutError as exc:
+        raise _ocupada(exc)
 
 
-@app.post("/upload-compras")
-async def upload_compras(
-    sri: list[UploadFile] = File(...),
-    _user: str = Depends(require_session),
-):
-    if not 1 <= len(sri) <= 5:
-        raise HTTPException(status_code=400, detail="Sube entre 1 y 5 archivos TXT del SRI")
-    nombres = _nombres_txt(sri)
+@app.post("/sesion/{sesion_id}/conciliar")
+def conciliar(sesion_id: str, _user: str = Depends(require_session)):
+    _sesion_o_404(sesion_id)
+    try:
+        return {"generacion": sesion.solicitar_recalculo(sesion_id)}
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Sesión no encontrada o expirada")
+    except TimeoutError as exc:
+        raise _ocupada(exc)
 
-    job_id = create_job()
-    await _guardar_txts(sri, nombres, get_job_dir(job_id) / "sri")
 
-    threading.Thread(target=run_pipeline_compras, args=(job_id,), daemon=True).start()
-    return {"job_id": job_id}
+@app.get("/tablero/{sesion_id}")
+def tablero(sesion_id: str, _user: str = Depends(require_session)):
+    _sesion_o_404(sesion_id)
+    try:
+        datos = sesion.leer_publicado(sesion_id, _PUBLICADOS["tablero"])
+    except TimeoutError as exc:
+        raise _ocupada(exc)
+    if datos is None:
+        raise HTTPException(status_code=404, detail="Tablero aún no disponible")
+    return Response(content=datos, media_type="application/json")
 
 
 @app.get("/status/{job_id}")
@@ -175,12 +214,17 @@ def status(job_id: str, _user: str = Depends(require_session)):
 
 
 @app.get("/download/{job_id}")
-def download(job_id: str, _user: str = Depends(require_session)):
-    excel = get_job_dir(job_id) / "resultado.xlsx"
-    if not excel.exists():
+def download(job_id: str, tipo: Literal["completo", "observaciones"] = "completo",
+             _user: str = Depends(require_session)):
+    if not _ID_RE.fullmatch(job_id) or not get_job_dir(job_id).is_dir():
         raise HTTPException(status_code=404, detail="Resultado no disponible aún")
-    return FileResponse(
-        path=str(excel),
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        filename="Conciliacion_SRI.xlsx",
+    try:
+        datos = sesion.leer_publicado(job_id, _PUBLICADOS[tipo])
+    except TimeoutError as exc:
+        raise _ocupada(exc)
+    if datos is None:
+        raise HTTPException(status_code=404, detail="Resultado no disponible aún")
+    return Response(
+        content=datos, media_type=XLSX_MEDIA,
+        headers={"Content-Disposition": f'attachment; filename="{_DESCARGAS[tipo]}"'},
     )

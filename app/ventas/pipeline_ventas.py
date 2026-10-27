@@ -1,19 +1,17 @@
 # -*- coding: utf-8 -*-
 """
 Runner del pipeline de conciliación de ventas: comprobantes EMITIDOS (facturas, NC, ND, liquidaciones
-de compra y retenciones) del SRI vs Odoo por API. Se ejecuta en un hilo background lanzado por app.py.
+de compra y retenciones) del SRI vs Odoo por API. `procesar_ventas` lo usa la sesión de trabajo (app/sesion.py) en un hilo background.
 
 Orden (falla rápido): TXT -> período -> Odoo (documentos y retenciones) -> XML de retenciones (solo si
 hay) -> clasificación -> Excel.
 """
-import traceback
 
 import pandas as pd
 
 from app.ventas.conciliar_emitidos import clasificar_documentos, conciliar_retenciones_emitidas
 from app.sri.emitidos_sri import TIPOS_DOC, leer_emitidos_txts, periodo_emitidos
 from app.ventas.excel_emitidos import construir_excel_emitidos
-from app.job_manager import write_status, schedule_cleanup, get_job_dir
 from app.odoo.client import COLUMNAS_EMITIDOS, OdooReader
 from app.compras.pipeline_compras import descargar_con_progreso
 from app.reportes.tablero import construir_tablero
@@ -131,19 +129,3 @@ def procesar_ventas(rutas, salida, avisar, cancelado=None, advertencias=None):
     tablero = construir_tablero("ventas", docs, docs_sri, odoo, retdocs, (desde, hasta),
                                 resumen["advertencias"])
     return resumen, tablero
-
-
-def run_pipeline_ventas(job_id: str) -> None:
-    """Flujo de un solo envío (ruta POST /upload-ventas): TXT en jobs/<id>/emitidos, resultado.xlsx
-    y status.json. Se retira junto con esa ruta; la sesión de trabajo usa procesar_ventas."""
-    job_dir = get_job_dir(job_id)
-    try:
-        rutas = sorted(str(p) for p in (job_dir / "emitidos").glob("*.txt"))
-        resumen, _ = procesar_ventas(rutas, str(job_dir / "resultado.xlsx"),
-                                     lambda m, p: write_status(job_id, "running", m, p))
-        write_status(job_id, "done", "Completado", 1.0, resumen=resumen)
-        schedule_cleanup(job_id, delay_seconds=7200)
-    except Exception as exc:
-        write_status(job_id, "error", f"{type(exc).__name__}: {exc}",
-                     error=traceback.format_exc())
-        schedule_cleanup(job_id, delay_seconds=7200)

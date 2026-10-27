@@ -182,8 +182,8 @@ def crear_sesion(modo: str) -> str:
     return sesion_id
 
 
-def agregar_txt(sesion_id: str, nombre: str, contenido: bytes) -> dict:
-    """Guarda el TXT (mismo nombre = reemplazo) y lo valida; ValueError si se excede el límite."""
+def _agregar(sesion_id: str, nombre: str, contenido: bytes) -> dict:
+    """agregar_txt sin reprogramar la limpieza (la reprograma quien llama, una vez por envío)."""
     nombre = _nombre_txt(nombre)
     ses = _leer_sesion(sesion_id)
     modo = ses["modo"]
@@ -214,8 +214,28 @@ def agregar_txt(sesion_id: str, nombre: str, contenido: bytes) -> dict:
             _guardar_sesion(sesion_id, ses)
     finally:
         tmp.unlink(missing_ok=True)
+    return entrada
+
+
+def agregar_txt(sesion_id: str, nombre: str, contenido: bytes) -> dict:
+    """Guarda el TXT (mismo nombre = reemplazo) y lo valida; ValueError si se excede el límite."""
+    entrada = _agregar(sesion_id, nombre, contenido)
     _actividad(sesion_id)
     return entrada
+
+
+def agregar_txts(sesion_id: str, archivos: list[tuple[str, bytes]]) -> list[dict]:
+    """Como agregar_txt para varios (nombre, contenido) de un mismo envío, pero reprograma la
+    limpieza una sola vez al terminar (aunque falle a la mitad: lo ya guardado cuenta como
+    actividad). Si un archivo excede el límite lanza ValueError y los anteriores quedan guardados."""
+    entradas = []
+    try:
+        for nombre, contenido in archivos:
+            entradas.append(_agregar(sesion_id, nombre, contenido))
+    finally:
+        if entradas:
+            _actividad(sesion_id)
+    return entradas
 
 
 def quitar_txt(sesion_id: str, nombre: str) -> None:
@@ -231,6 +251,27 @@ def quitar_txt(sesion_id: str, nombre: str) -> None:
 
 def listar_txt(sesion_id: str) -> list[dict]:
     return list(_leer_sesion(sesion_id)["archivos"])
+
+
+def generacion_actual(sesion_id: str) -> int:
+    """Generación solicitada más reciente (la que el cliente recibió de `solicitar_recalculo`)."""
+    return int(_leer_sesion(sesion_id).get("generacion", 0))
+
+
+def existe(sesion_id: str) -> bool:
+    return _ruta_sesion(sesion_id).exists()
+
+
+def leer_publicado(sesion_id: str, archivo: str) -> bytes | None:
+    """Contenido de una salida publicada (`tablero.json`, `resultado.xlsx`, `observaciones.xlsx`)
+    o None si no existe. Se lee bajo el mismo bloqueo con el que `recalcular` renombra las tres
+    salidas, así que el lector ve siempre el conjunto de una única generación (nunca el Excel de
+    una y el tablero de otra). TimeoutError si la sesión está ocupada."""
+    if archivo not in _SALIDAS:
+        raise ValueError(f"Salida desconocida: {archivo!r}")
+    with _bloqueo(sesion_id):
+        ruta = get_job_dir(sesion_id) / archivo
+        return ruta.read_bytes() if ruta.exists() else None
 
 
 # ----------------------------------------------------------------------------- recálculo

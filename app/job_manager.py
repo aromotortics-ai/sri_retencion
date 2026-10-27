@@ -57,7 +57,14 @@ def write_status(
     # Escritura atómica: escribir a .tmp y renombrar
     tmp = status_file.with_suffix(".tmp")
     tmp.write_text(json.dumps(status, ensure_ascii=False), encoding="utf-8")
-    tmp.replace(status_file)
+    for intento in range(50):  # Windows: falla mientras un lector (GET /status) tiene abierto el destino
+        try:
+            tmp.replace(status_file)
+            break
+        except PermissionError:
+            if intento == 49:
+                raise
+            time.sleep(0.02)
 
 
 def read_status(job_id: str) -> dict | None:

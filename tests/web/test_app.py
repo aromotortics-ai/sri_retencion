@@ -79,112 +79,6 @@ def test_logout_clears_session(client):
     assert "/login" in r2.headers["location"]
 
 
-def test_upload_ventas_returns_401_without_session(client):
-    assert client.post("/upload-ventas").status_code == 401
-
-
-def test_upload_ventas_missing_files(client):
-    cookies = _login(client)
-    assert client.post("/upload-ventas", cookies=cookies).status_code == 422
-
-
-def test_upload_ventas_acepta_txt_con_nombre_del_portal(client, monkeypatch):
-    import app.web.main as app_module
-    from app.job_manager import get_job_dir
-    monkeypatch.setattr(app_module, "run_pipeline_ventas", lambda job_id: None)
-
-    cookies = _login(client)
-    r = client.post(
-        "/upload-ventas",
-        cookies=cookies,
-        files=[
-            ("emitidos", ("2390000831001_EmitidosAutorizados (1).txt", b"a", "text/plain")),
-            ("emitidos", ("2390000831001_EmitidosAutorizados (1).txt", b"b", "text/plain")),
-        ],
-    )
-    assert r.status_code == 200
-    d = get_job_dir(r.json()["job_id"]) / "emitidos"
-    nombres = sorted(p.name for p in d.iterdir())
-    assert "2390000831001_EmitidosAutorizados (1).txt" in nombres
-    assert len(nombres) == 2  # el repetido se conserva con prefijo numérico
-
-
-def test_upload_ventas_nombre_con_ruta_no_escapa_del_job(client, monkeypatch):
-    import app.web.main as app_module
-    from app.job_manager import get_job_dir
-    monkeypatch.setattr(app_module, "run_pipeline_ventas", lambda job_id: None)
-    cookies = _login(client)
-    r = client.post("/upload-ventas", cookies=cookies,
-                    files=[("emitidos", ("../../evil.txt", b"x", "text/plain"))])
-    assert r.status_code == 200
-    d = get_job_dir(r.json()["job_id"])
-    assert [p.name for p in (d / "emitidos").iterdir()] == ["evil.txt"]
-
-
-def _nombres_guardados(client, monkeypatch, ruta, campo, pipeline, archivos):
-    import app.web.main as app_module
-    from app.job_manager import get_job_dir
-    monkeypatch.setattr(app_module, pipeline, lambda job_id: None)
-    cookies = _login(client)
-    r = client.post(ruta, cookies=cookies,
-                    files=[(campo, (n, b"x", "text/plain")) for n in archivos])
-    assert r.status_code == 200
-    d = get_job_dir(r.json()["job_id"]) / ("emitidos" if campo == "emitidos" else "sri")
-    nombres = sorted(p.name for p in d.iterdir())
-    # el pipeline usa glob("*.txt"), sensible a mayúsculas en Linux
-    assert all(n.endswith(".txt") for n in nombres), nombres
-    assert sorted(p.name for p in d.glob("*.txt")) == nombres
-    return nombres
-
-
-def test_upload_ventas_normaliza_extension_mayuscula(client, monkeypatch):
-    nombres = _nombres_guardados(client, monkeypatch, "/upload-ventas", "emitidos",
-                                 "run_pipeline_ventas", ["SEMANA.TXT"])
-    assert nombres == ["SEMANA.txt"]
-
-
-def test_upload_ventas_extensiones_distintas_no_se_pisan(client, monkeypatch):
-    nombres = _nombres_guardados(client, monkeypatch, "/upload-ventas", "emitidos",
-                                 "run_pipeline_ventas", ["a.TXT", "a.txt"])
-    assert len(nombres) == 2
-
-
-def test_upload_compras_normaliza_extension_mayuscula(client, monkeypatch):
-    nombres = _nombres_guardados(client, monkeypatch, "/upload-compras", "sri",
-                                 "run_pipeline_compras", ["SEMANA.TXT", "b.Txt"])
-    assert nombres == ["SEMANA.txt", "b.txt"]
-
-
-def test_upload_ventas_rechaza_no_txt(client, monkeypatch):
-    import app.web.main as app_module
-    monkeypatch.setattr(app_module, "run_pipeline_ventas", lambda job_id: None)
-    cookies = _login(client)
-    r = client.post("/upload-ventas", cookies=cookies,
-                    files=[("emitidos", ("odoo.xlsx", b"x", "application/octet-stream"))])
-    assert r.status_code == 400
-
-
-def test_upload_ventas_acepta_mas_de_60_archivos_y_rechaza_sobre_el_maximo(client, monkeypatch):
-    import app.web.main as app_module
-    monkeypatch.setattr(app_module, "run_pipeline_ventas", lambda job_id: None)
-    cookies = _login(client)
-    n_max = app_module.MAX_TXT_VENTAS
-    mas_de_60 = [("emitidos", (f"e{i}.txt", b"x", "text/plain")) for i in range(61)]
-    assert client.post("/upload-ventas", cookies=cookies, files=mas_de_60).status_code == 200
-    sobre_max = [("emitidos", (f"e{i}.txt", b"x", "text/plain")) for i in range(n_max + 1)]
-    assert client.post("/upload-ventas", cookies=cookies, files=sobre_max).status_code == 400
-
-
-def test_upload_ventas_ya_no_pide_excel_de_odoo(client, monkeypatch):
-    import app.web.main as app_module
-    monkeypatch.setattr(app_module, "run_pipeline_ventas", lambda job_id: None)
-    cookies = _login(client)
-    r = client.post("/upload-ventas", cookies=cookies,
-                    files=[("emitidos", ("a.txt", b"x", "text/plain"))])
-    assert r.status_code == 200
-    assert "job_id" in r.json()
-
-
 def test_download_ventas_name(client):
     from app.job_manager import create_job, get_job_dir
     cookies = _login(client)
@@ -193,57 +87,195 @@ def test_download_ventas_name(client):
     r = client.get(f"/download/{job_id}", cookies=cookies)
     assert r.status_code == 200
 
+# ------------------------------------------------------------------ API de la sesión
 
-def test_upload_compras_requiere_sesion(client):
-    r = client.post("/upload-compras", files=[("sri", ("a.txt", b"x", "text/plain"))])
+XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+@pytest.fixture
+def entorno_sesion(client, tmp_path, monkeypatch):
+    """Cliente con Odoo, descarga de XML, LibreOffice y limpieza falsos (sin red ni Odoo real)."""
+    import pandas as pd
+    import app.odoo.client as odoo_client
+    import app.compras.pipeline_compras as pc
+    import app.sesion as sesion
+
+    class Lector:
+        def fetch_compras(self, desde, hasta, margen_dias=5):
+            return pd.DataFrame(columns=odoo_client.COLUMNAS)
+
+        def fetch_retenciones(self, desde, hasta, margen_dias=5):
+            return pd.DataFrame(columns=odoo_client.COLUMNAS_RET)
+
+    programadas = []
+    monkeypatch.setattr(sesion, "schedule_cleanup", lambda *a, **k: programadas.append(a))
+    monkeypatch.setattr("shutil.which", lambda *_: None)
+    monkeypatch.setattr(pc, "CACHE_XML_DIR", tmp_path / "cache" / "xml")
+    monkeypatch.setattr(pc, "descargar_xmls", lambda *a, **k: [])
+    monkeypatch.setattr(pc.OdooReader, "from_env", classmethod(lambda cls: Lector()))
+    return client, _login(client), programadas
+
+
+def _crear(client, cookies, modo="compras"):
+    r = client.post("/sesion", cookies=cookies, json={"modo": modo})
+    assert r.status_code == 200, r.text
+    return r.json()["sesion_id"]
+
+
+def _subir(client, cookies, sid, *archivos):
+    return client.post(f"/sesion/{sid}/txt", cookies=cookies,
+                       files=[("archivos", (n, c, "text/plain")) for n, c in archivos])
+
+
+def _esperar_done(client, cookies, sid, timeout=30):
+    import time
+    limite = time.monotonic() + timeout
+    while time.monotonic() < limite:
+        s = client.get(f"/status/{sid}", cookies=cookies).json()
+        if s["estado"] in ("done", "error"):
+            return s
+        time.sleep(0.05)
+    raise AssertionError("el recálculo no terminó")
+
+
+def _conciliar(client, cookies, sid):
+    r = client.post(f"/sesion/{sid}/conciliar", cookies=cookies)
+    assert r.status_code == 200
+    gen = r.json()["generacion"]
+    s = _esperar_done(client, cookies, sid)
+    assert s["estado"] == "done", s
+    return gen
+
+
+def test_flujo_crear_subir_conciliar_tablero(entorno_sesion):
+    from test_sesion import _txt
+    client, cookies, _ = entorno_sesion
+    sid = _crear(client, cookies)
+    r = _subir(client, cookies, sid, ("facturas.txt", _txt(1, 2)))
+    assert r.status_code == 200
+    cuerpo = r.json()
+    assert [a["nombre"] for a in cuerpo["archivos"]] == ["facturas.txt"]
+    assert cuerpo["archivos"][0]["estado"] == "ok"
+    assert cuerpo["generacion"] == 0  # subir no recalcula
+    gen = _conciliar(client, cookies, sid)
+    assert gen == 1
+    t = client.get(f"/tablero/{sid}", cookies=cookies)
+    assert t.status_code == 200
+    assert t.json()["tarjetas"] and t.json()["generacion"] == 1
+
+
+def test_tablero_404_antes_de_conciliar(entorno_sesion):
+    client, cookies, _ = entorno_sesion
+    sid = _crear(client, cookies)
+    assert client.get(f"/tablero/{sid}", cookies=cookies).status_code == 404
+
+
+def test_subir_sin_sesion_da_401(client):
+    assert client.post("/sesion", json={"modo": "compras"}).status_code == 401
+    r = client.post("/sesion/abcdef01/txt", files=[("archivos", ("a.txt", b"x", "text/plain"))])
     assert r.status_code == 401
+    assert client.delete("/sesion/abcdef01/txt/a.txt").status_code == 401
+    assert client.post("/sesion/abcdef01/conciliar").status_code == 401
+    assert client.get("/tablero/abcdef01").status_code == 401
+    assert client.get("/download/abcdef01").status_code == 401
 
 
-def test_upload_compras_devuelve_job_id(client, monkeypatch):
-    import app.web.main as app_module
-    monkeypatch.setattr(app_module, "run_pipeline_compras", lambda job_id: None)
-    cookies = _login(client)
-    r = client.post("/upload-compras", cookies=cookies,
-                    files=[("sri", ("a.txt", b"x", "text/plain")), ("sri", ("b.txt", b"y", "text/plain"))])
-    assert r.status_code == 200
+def test_modo_invalido_se_rechaza(entorno_sesion):
+    client, cookies, _ = entorno_sesion
+    assert client.post("/sesion", cookies=cookies, json={"modo": "otro"}).status_code in (400, 422)
+    assert client.post("/sesion", cookies=cookies, json={}).status_code in (400, 422)
+
+
+def test_nombre_con_ruta_se_sanea(entorno_sesion):
+    from test_sesion import _txt
     from app.job_manager import get_job_dir
-    d = get_job_dir(r.json()["job_id"]) / "sri"
-    assert sorted(p.name for p in d.iterdir()) == ["a.txt", "b.txt"]
-
-
-def test_upload_compras_nombre_con_ruta_no_escapa_del_job(client, monkeypatch):
-    import app.web.main as app_module
-    monkeypatch.setattr(app_module, "run_pipeline_compras", lambda job_id: None)
-    cookies = _login(client)
-    r = client.post("/upload-compras", cookies=cookies,
-                    files=[("sri", ("../../evil.txt", b"x", "text/plain")),
-                           ("sri", (r"..\..\evil.txt", b"y", "text/plain"))])
+    client, cookies, _ = entorno_sesion
+    sid = _crear(client, cookies)
+    r = _subir(client, cookies, sid, ("../../x.txt", _txt(1)), ("..\\..\\y.TXT", _txt(2)))
     assert r.status_code == 200
-    from app.job_manager import get_job_dir
-    d = get_job_dir(r.json()["job_id"])
-    assert not (d.parent.parent / "evil.txt").exists()
-    assert len(list((d / "sri").iterdir())) == 2
+    assert [a["nombre"] for a in r.json()["archivos"]] == ["x.txt", "y.txt"]
+    assert sorted(p.name for p in (get_job_dir(sid) / "txt").iterdir()) == ["x.txt", "y.txt"]
+    assert not (get_job_dir(sid).parent.parent / "x.txt").exists()
 
 
-def test_upload_compras_rechaza_no_txt_mas_de_5_y_vacio(client, monkeypatch):
-    import app.web.main as app_module
-    monkeypatch.setattr(app_module, "run_pipeline_compras", lambda job_id: None)
-    cookies = _login(client)
-    r = client.post("/upload-compras", cookies=cookies, files=[("sri", ("a.xlsx", b"x", "text/plain"))])
+def test_rechaza_archivo_no_txt(entorno_sesion):
+    from test_sesion import _txt
+    client, cookies, _ = entorno_sesion
+    sid = _crear(client, cookies)
+    r = _subir(client, cookies, sid, ("ok.txt", _txt(1)), ("odoo.xlsx", b"x"))
     assert r.status_code == 400
-    seis = [("sri", (f"{i}.txt", b"x", "text/plain")) for i in range(6)]
-    assert client.post("/upload-compras", cookies=cookies, files=seis).status_code == 400
-    assert client.post("/upload-compras", cookies=cookies).status_code in (400, 422)
+    # nada se guardó: se valida todo el envío antes de tocar la sesión
+    assert client.delete(f"/sesion/{sid}/txt/ok.txt", cookies=cookies).json()["archivos"] == []
 
 
-def test_upload_compras_acepta_txt_de_retenciones(client, monkeypatch):
-    import app.web.main as app_module
-    monkeypatch.setattr(app_module, "run_pipeline_compras", lambda job_id: None)
-    cookies = _login(client)
-    r = client.post("/upload-compras", cookies=cookies,
-                    files=[("sri", ("retenciones.txt", b"x", "text/plain"))])
+def test_limite_de_txt_da_400(entorno_sesion):
+    from test_sesion import _txt
+    client, cookies, _ = entorno_sesion
+    sid = _crear(client, cookies)  # compras: máximo 5
+    r = _subir(client, cookies, sid, *[(f"f{i}.txt", _txt(i + 1)) for i in range(5)])
+    assert r.status_code == 200 and len(r.json()["archivos"]) == 5
+    r = _subir(client, cookies, sid, ("f6.txt", _txt(9)))
+    assert r.status_code == 400
+    assert "5" in r.json()["detail"]
+    # reemplazar uno existente sigue permitido
+    assert _subir(client, cookies, sid, ("f0.txt", _txt(1, 2))).status_code == 200
+
+
+def test_subida_masiva_programa_una_sola_limpieza(entorno_sesion):
+    client, cookies, programadas = entorno_sesion
+    sid = _crear(client, cookies, "ventas")
+    antes = len(programadas)
+    r = _subir(client, cookies, sid, *[(f"e{i}.txt", b"x") for i in range(40)])
+    assert r.status_code == 200 and len(r.json()["archivos"]) == 40
+    assert len(programadas) - antes == 1
+
+
+def test_quitar_txt(entorno_sesion):
+    from test_sesion import _txt
+    client, cookies, _ = entorno_sesion
+    sid = _crear(client, cookies)
+    _subir(client, cookies, sid, ("a.txt", _txt(1)), ("b.txt", _txt(2)))
+    r = client.delete(f"/sesion/{sid}/txt/a.txt", cookies=cookies)
     assert r.status_code == 200
-    assert "job_id" in r.json()
+    assert [a["nombre"] for a in r.json()["archivos"]] == ["b.txt"]
+
+
+def test_descargar_observaciones_y_completo(entorno_sesion):
+    from test_sesion import _txt
+    client, cookies, _ = entorno_sesion
+    sid = _crear(client, cookies)
+    _subir(client, cookies, sid, ("facturas.txt", _txt(1, 2)))
+    _conciliar(client, cookies, sid)
+    for url, nombre in ((f"/download/{sid}?tipo=observaciones", "Observaciones_SRI.xlsx"),
+                        (f"/download/{sid}?tipo=completo", "Conciliacion_SRI.xlsx"),
+                        (f"/download/{sid}", "Conciliacion_SRI.xlsx")):
+        r = client.get(url, cookies=cookies)
+        assert r.status_code == 200, url
+        assert r.headers["content-type"].startswith(XLSX)
+        assert nombre in r.headers["content-disposition"]
+        assert r.content[:2] == b"PK"  # un .xlsx es un zip
+    assert client.get(f"/download/{sid}?tipo=otro", cookies=cookies).status_code in (400, 422)
+
+
+def test_descarga_completo_404_sin_txt_validos(entorno_sesion):
+    client, cookies, _ = entorno_sesion
+    sid = _crear(client, cookies)
+    _conciliar(client, cookies, sid)  # sin TXT: tablero vacío, sin Excel completo
+    assert client.get(f"/tablero/{sid}", cookies=cookies).status_code == 200
+    assert client.get(f"/download/{sid}", cookies=cookies).status_code == 404
+    assert client.get(f"/download/{sid}?tipo=observaciones", cookies=cookies).status_code == 200
+
+
+def test_sesion_inexistente_404(entorno_sesion):
+    from test_sesion import _txt
+    client, cookies, _ = entorno_sesion
+    for sid in ("abcdef01", "xxxxxxxx", "ABCDEF01", "abcdef012"):
+        assert _subir(client, cookies, sid, ("a.txt", _txt(1))).status_code == 404, sid
+        assert client.delete(f"/sesion/{sid}/txt/a.txt", cookies=cookies).status_code == 404, sid
+        assert client.post(f"/sesion/{sid}/conciliar", cookies=cookies).status_code == 404, sid
+        assert client.get(f"/tablero/{sid}", cookies=cookies).status_code == 404, sid
+        assert client.get(f"/download/{sid}", cookies=cookies).status_code == 404, sid
+    assert client.get("/tablero/%2e%2e", cookies=cookies).status_code == 404
 
 
 def test_index_menciona_retenciones_en_compras(client):

@@ -10,7 +10,8 @@ import openpyxl
 import pandas as pd
 
 import app.odoo.client as odoo_client
-from _helpers import _autorizacion
+import _helpers
+from _helpers import _autorizacion, correr_pipeline
 from app.sri.emitidos_sri import RUC_EMPRESA
 from app.job_manager import create_job, get_job_dir, read_status
 from app.odoo.client import OdooError
@@ -103,7 +104,6 @@ def _entorno(tmp_path, monkeypatch, txts, lector=None, descarga=None):
     carpeta.mkdir()
     for nombre, filas in txts.items():
         _escribir_txt(carpeta / nombre, filas)
-    monkeypatch.setattr(pv, "schedule_cleanup", lambda *a, **k: None)
     monkeypatch.setattr("shutil.which", lambda *_: None)  # sin LibreOffice: Excel tal cual
     cache = tmp_path / "cache" / "xml"
     monkeypatch.setattr(pv, "CACHE_XML_DIR", cache)
@@ -122,12 +122,12 @@ def _entorno(tmp_path, monkeypatch, txts, lector=None, descarga=None):
 
 def _espiar_status(pv, monkeypatch):
     vistos = []
-    original = pv.write_status
+    original = _helpers.write_status
 
     def espia(job_id, estado, mensaje, progreso=0.0, **kw):
         vistos.append((mensaje, round(progreso, 3)))
         return original(job_id, estado, mensaje, progreso, **kw)
-    monkeypatch.setattr(pv, "write_status", espia)
+    monkeypatch.setattr(_helpers, "write_status", espia)
     return vistos
 
 
@@ -141,7 +141,7 @@ def test_pipeline_done_con_todos_los_tipos(tmp_path, monkeypatch):
     pv, job_id, lector, cache, llamadas = _entorno(tmp_path, monkeypatch, _todos(), lector=lector)
     _xml(cache, CLAVE_R1)
     vistos = _espiar_status(pv, monkeypatch)
-    pv.run_pipeline_ventas(job_id)
+    correr_pipeline(pv, job_id, "ventas")
     s = read_status(job_id)
     assert s["estado"] == "done", s
     assert (get_job_dir(job_id) / "resultado.xlsx").exists()
@@ -170,7 +170,7 @@ def test_pipeline_done_con_todos_los_tipos(tmp_path, monkeypatch):
 def test_pipeline_sin_txt_validos(tmp_path, monkeypatch):
     guia = _fila("Guía de Remisión", "001-004-000000001", _clave(900))
     pv, job_id, lector, _, llamadas = _entorno(tmp_path, monkeypatch, {"x.txt": [guia]})
-    pv.run_pipeline_ventas(job_id)
+    correr_pipeline(pv, job_id, "ventas")
     s = read_status(job_id)
     assert s["estado"] == "error"
     assert ("Los TXT no contienen facturas, notas de crédito, notas de débito, liquidaciones de compra "
@@ -180,7 +180,7 @@ def test_pipeline_sin_txt_validos(tmp_path, monkeypatch):
 
 def test_pipeline_sin_ningun_txt_es_error(tmp_path, monkeypatch):
     pv, job_id, lector, _, _ = _entorno(tmp_path, monkeypatch, {})
-    pv.run_pipeline_ventas(job_id)
+    correr_pipeline(pv, job_id, "ventas")
     s = read_status(job_id)
     assert s["estado"] == "error"
     assert "Los TXT no contienen" in s["mensaje"]
@@ -191,7 +191,7 @@ def test_pipeline_odoo_falla_antes_de_descargar_xml(tmp_path, monkeypatch):
         def fetch_retenciones_emitidas(self, desde, hasta, margen_dias=5):
             raise OdooError("No se pudo conectar con Odoo")
     pv, job_id, lector, _, llamadas = _entorno(tmp_path, monkeypatch, _todos(), lector=Caido())
-    pv.run_pipeline_ventas(job_id)
+    correr_pipeline(pv, job_id, "ventas")
     s = read_status(job_id)
     assert s["estado"] == "error"
     assert s["mensaje"].startswith("OdooError")
@@ -204,7 +204,7 @@ def test_pipeline_sin_credenciales_no_descarga(tmp_path, monkeypatch):
     def sin_env(cls):
         raise OdooError("Falta configurar ODOO_URL")
     monkeypatch.setattr(pv.OdooReader, "from_env", classmethod(sin_env))
-    pv.run_pipeline_ventas(job_id)
+    correr_pipeline(pv, job_id, "ventas")
     s = read_status(job_id)
     assert s["estado"] == "error" and "ODOO_URL" in s["mensaje"]
     assert llamadas == []
@@ -212,7 +212,7 @@ def test_pipeline_sin_credenciales_no_descarga(tmp_path, monkeypatch):
 
 def test_pipeline_lee_odoo_antes_de_descargar(tmp_path, monkeypatch):
     pv, job_id, lector, _, _ = _entorno(tmp_path, monkeypatch, _todos())
-    pv.run_pipeline_ventas(job_id)
+    correr_pipeline(pv, job_id, "ventas")
     assert read_status(job_id)["estado"] == "done"
     assert lector.orden == ["fetch_emitidos", "fetch_retenciones_emitidas", "descargar_xmls"]
 
@@ -225,7 +225,7 @@ def test_pipeline_xml_todos_fallidos(tmp_path, monkeypatch):
         return [{"clave": c, "motivo": "NO AUTORIZADO"} for c in claves]
     pv, job_id, _, _, _ = _entorno(
         tmp_path, monkeypatch, {"r.txt": [_ret(), _ret(CLAVE_R2, N_RET2)]}, lector=lector, descarga=descarga)
-    pv.run_pipeline_ventas(job_id)
+    correr_pipeline(pv, job_id, "ventas")
     s = read_status(job_id)
     assert s["estado"] == "done", s
     r = s["resumen"]
@@ -239,7 +239,7 @@ def test_pipeline_xml_todos_fallidos(tmp_path, monkeypatch):
 
 def test_pipeline_solo_documentos_no_descarga_xml(tmp_path, monkeypatch):
     pv, job_id, lector, _, llamadas = _entorno(tmp_path, monkeypatch, {"f.txt": [_fac(1), _nc(1)]})
-    pv.run_pipeline_ventas(job_id)
+    correr_pipeline(pv, job_id, "ventas")
     s = read_status(job_id)
     assert s["estado"] == "done", s
     assert llamadas == []
@@ -254,7 +254,7 @@ def test_pipeline_solo_documentos_no_descarga_xml(tmp_path, monkeypatch):
 def test_pipeline_solo_retenciones_no_lee_documentos_de_odoo(tmp_path, monkeypatch):
     pv, job_id, lector, cache, _ = _entorno(tmp_path, monkeypatch, {"r.txt": [_ret()]})
     _xml(cache, CLAVE_R1)
-    pv.run_pipeline_ventas(job_id)
+    correr_pipeline(pv, job_id, "ventas")
     s = read_status(job_id)
     assert s["estado"] == "done", s
     assert lector.emitidos is None
@@ -273,7 +273,7 @@ def test_pipeline_advierte_tipo_sin_txt_con_registros_en_odoo(tmp_path, monkeypa
                          _doc_odoo(2, "NC", "001-002-000000001", _clave(201), total=11.5, base=10.0),
                          fuera, borrador])
     pv, job_id, _, _, _ = _entorno(tmp_path, monkeypatch, {"nc.txt": [_nc(1)]}, lector=lector)
-    pv.run_pipeline_ventas(job_id)
+    correr_pipeline(pv, job_id, "ventas")
     s = read_status(job_id)
     assert s["estado"] == "done", s
     adv = s["resumen"]["advertencias"]
@@ -287,7 +287,7 @@ def test_pipeline_advierte_tipo_sin_txt_con_registros_en_odoo(tmp_path, monkeypa
 def test_pipeline_sin_advertencia_de_tipo_si_hay_txt(tmp_path, monkeypatch):
     lector = _Odoo(docs=[_doc_odoo(1, "FAC", "001-001-000000001", _clave(101))])
     pv, job_id, _, _, _ = _entorno(tmp_path, monkeypatch, {"f.txt": [_fac(1)]}, lector=lector)
-    pv.run_pipeline_ventas(job_id)
+    correr_pipeline(pv, job_id, "ventas")
     s = read_status(job_id)
     assert s["estado"] == "done", s
     assert not any(a.startswith("Falta el TXT") for a in s["resumen"]["advertencias"])
@@ -296,7 +296,7 @@ def test_pipeline_sin_advertencia_de_tipo_si_hay_txt(tmp_path, monkeypatch):
 def test_pipeline_rango_amplio_advierte(tmp_path, monkeypatch):
     pv, job_id, lector, _, _ = _entorno(
         tmp_path, monkeypatch, {"f.txt": [_fac(1, "01/07/2026"), _fac(2, "20/09/2026")]})
-    pv.run_pipeline_ventas(job_id)
+    correr_pipeline(pv, job_id, "ventas")
     s = read_status(job_id)
     assert s["estado"] == "done", s
     assert s["resumen"]["periodo"] == ["2026-07-01", "2026-09-20"]
@@ -307,7 +307,7 @@ def test_pipeline_rango_amplio_advierte(tmp_path, monkeypatch):
 def test_pipeline_retenciones_sin_fechas_validas_es_error(tmp_path, monkeypatch):
     pv, job_id, lector, _, llamadas = _entorno(
         tmp_path, monkeypatch, {"f.txt": [_fac(1)], "r.txt": [_ret(fecha="")]})
-    pv.run_pipeline_ventas(job_id)
+    correr_pipeline(pv, job_id, "ventas")
     s = read_status(job_id)
     assert s["estado"] == "error"
     assert "fechas de emisión válidas" in s["mensaje"]
@@ -322,7 +322,7 @@ def test_pipeline_progreso_de_descarga(tmp_path, monkeypatch):
     pv, job_id, _, _, _ = _entorno(
         tmp_path, monkeypatch, {"r.txt": [_ret(), _ret(CLAVE_R2, N_RET2)]}, descarga=descarga)
     vistos = _espiar_status(pv, monkeypatch)
-    pv.run_pipeline_ventas(job_id)
+    correr_pipeline(pv, job_id, "ventas")
     assert read_status(job_id)["estado"] == "done"
     assert ("Descargando XML de retenciones (1/2, 0 fallidos)", 0.4) in vistos
     assert ("Descargando XML de retenciones (2/2, 1 fallidos)", 0.65) in vistos
@@ -332,22 +332,13 @@ def test_pipeline_con_libreoffice_sin_advertencia(tmp_path, monkeypatch):
     pv, job_id, _, _, _ = _entorno(tmp_path, monkeypatch, {"f.txt": [_fac(1)]})
     import app.ventas.excel_emitidos as excel_emitidos
     monkeypatch.setattr(excel_emitidos, "_recalcular", lambda ruta: True)
-    pv.run_pipeline_ventas(job_id)
+    correr_pipeline(pv, job_id, "ventas")
     s = read_status(job_id)
     assert s["estado"] == "done", s
     assert s["resumen"]["recalculado"] is True
     assert ADV_LIBRE not in s["resumen"]["advertencias"]
 
 
-def test_pipeline_con_error_agenda_limpieza(tmp_path, monkeypatch):
-    pv, job_id, _, _, _ = _entorno(tmp_path, monkeypatch, {})
-    llamadas = []
-    monkeypatch.setattr(pv, "schedule_cleanup", lambda *a, **k: llamadas.append((a, k)))
-    pv.run_pipeline_ventas(job_id)
-    s = read_status(job_id)
-    assert s["estado"] == "error"
-    assert s["error"]  # traceback
-    assert llamadas == [((job_id,), {"delay_seconds": 7200})]
 
 
 def test_procesar_ventas_devuelve_tablero_con_las_mismas_cifras(tmp_path, monkeypatch):
