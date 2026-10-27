@@ -5,6 +5,7 @@ import re
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
 
+from app.compras.excel_compras import _proteger
 from app.reportes.estilos import _enc, _fuente
 
 QUE_CORREGIR = {
@@ -52,6 +53,7 @@ def escribir_excel_observaciones(tablero: dict, ruta: str) -> int:
         for o in (x for x in obs if x["estado"] == estado):
             ws.append([o.get(c) for c in columnas])
         _fuente(ws)
+        _proteger(ws)  # texto de SRI/Odoo que empieza con = + - @ no se guarda como fórmula
         ws.freeze_panes = "A2"
         ws.auto_filter.ref = f"A1:{get_column_letter(len(columnas))}{ws.max_row}"
         for i, w in enumerate(_ANCHOS, 1):

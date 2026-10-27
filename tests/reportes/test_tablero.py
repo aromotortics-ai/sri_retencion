@@ -8,6 +8,7 @@ import pytest
 import app.compras.excel_compras as excel_compras
 import app.retenciones.conciliar_retenciones as cr
 import app.ventas.excel_emitidos as excel_emitidos
+from app.compras.conciliar_compras import CAT_DUP, CAT_INFO, CAT_SOLO_ODOO
 from app.compras.clasificar import clasificar_compras
 from app.compras.excel_compras import construir_excel
 from app.reportes.tablero import construir_tablero
@@ -158,6 +159,16 @@ def test_cifras_tablero_igualan_excel_completo(tmp_path):
         assert sum(c["por_estado"].values()) == c["total"]
     # Compras
     sri, odoo, pares = _datos_c()
+    odoo = pd.concat([odoo, pd.DataFrame([
+        [12, "BILL/3", "001-001-000000009", "X SA", "1790000000001", F, "FAC", "01", "9" * 49,
+         5.0, 0.0, 5.0, pd.NA, True],
+        [13, "BILL/4", "", "Y SA", "", F, "FAC", "02", pd.NA, 5.0, 0.0, 5.0, pd.NA, False],
+        [14, "BILL/9", "001-001-000000001", "PROV SA", "1790000000001", F, "FAC", "01", "1" * 49,
+         100.0, 15.0, 115.0, pd.NA, True]], columns=odoo.columns)], ignore_index=True)
+    pares = pd.concat([pares, pd.DataFrame({
+        "idx_sri": pd.array([None, None, 0], dtype="Int64"), "id_odoo": pd.array([12, 13, 14], dtype="Int64"),
+        "tipo": ["FAC"] * 3, "metodo": ["", "", "Clave de acceso"],
+        "cat": [CAT_SOLO_ODOO, CAT_INFO, CAT_DUP]})], ignore_index=True)
     por_tipo = construir_excel(sri, odoo, pares, DESDE, HASTA, str(tmp_path / "c.xlsx"))
     docs = clasificar_compras(sri, odoo, pares)
     t = construir_tablero("compras", docs, sri, odoo, None, None, [])
@@ -170,6 +181,8 @@ def test_cifras_tablero_igualan_excel_completo(tmp_path):
         assert c["por_estado"].get("Solo en Odoo", 0) == e["solo_odoo"]
         assert c["por_estado"].get("Diferencia de valor", 0) == e["diferencias"]
         assert c["por_estado"].get("Informativo", 0) == e["informativos"]
+    assert por_tipo["FAC"]["solo_odoo"] == 1 and por_tipo["FAC"]["informativos"] == 1
+    assert tarj["FAC"]["por_estado"]["Duplicado en Odoo"] == 1
     # contraparte de Compras: proveedor del SRI
     ex = [x for x in t["excepciones"] if x["estado"] == "Diferencia de valor"][0]
     assert ex["contraparte"] == "OTRO SA" and ex["diferencia"] == 10.0

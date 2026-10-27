@@ -36,6 +36,20 @@ def test_excel_observaciones_solo_accionables(tmp_path):
     assert all(c.font.name == "Arial" for w in wb for r in w.iter_rows() for c in r if c.value is not None)
 
 
+def test_texto_peligroso_no_se_guarda_como_formula(tmp_path):
+    exc = [_fila("Solo en SRI", 1, contraparte='=HYPERLINK("http://x","y")', detalle="+cmd",
+                 documento="@SUM(1)", ruc="-1+1")]
+    ruta = str(tmp_path / "o.xlsx")
+    escribir_excel_observaciones({"excepciones": exc}, ruta)
+    ws = openpyxl.load_workbook(ruta)["Solo en SRI"]
+    cols = COLUMNAS_OBS[:-1]
+    esperado = {"contraparte": '=HYPERLINK("http://x","y")', "detalle": "+cmd", "documento": "@SUM(1)",
+                "ruc": "-1+1"}
+    for nombre, valor in esperado.items():
+        c = ws.cell(row=2, column=cols.index(nombre) + 1)
+        assert c.value == valor and c.data_type == "s", nombre
+
+
 def test_excel_sin_observaciones_es_valido(tmp_path):
     ruta = str(tmp_path / "o.xlsx")
     n = escribir_excel_observaciones({"excepciones": []}, ruta)
