@@ -7,15 +7,15 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copiar código fuente
-COPY *.py .
-COPY templates/ templates/
+COPY app/ app/
+COPY scripts/ scripts/
 
 # Crear directorios para volúmenes persistentes
 RUN mkdir -p cache/xml jobs data
 
 EXPOSE 8000
 
-CMD ["gunicorn", "app:app", \
+CMD ["gunicorn", "app.web.main:app", \
      "-w", "2", \
      "-k", "uvicorn.workers.UvicornWorker", \
      "--bind", "0.0.0.0:8000", \
