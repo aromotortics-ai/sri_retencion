@@ -19,6 +19,7 @@ vigente). El bloqueo es un archivo `jobs/<id>/.lock` creado con O_EXCL, así que
 hilos de un mismo proceso y a los distintos workers.
 """
 import json
+import logging
 import os
 import threading
 import time
@@ -370,6 +371,7 @@ def recalcular(sesion_id: str, generacion: int) -> None:
     except _Cancelado:
         pass
     except Exception as exc:
+        logging.getLogger(__name__).error("Recálculo de la sesión %s falló", sesion_id, exc_info=True)
         try:
             with _bloqueo(sesion_id):
                 if _vigente(sesion_id, generacion):

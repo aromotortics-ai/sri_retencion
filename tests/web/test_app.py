@@ -409,3 +409,29 @@ def test_tablero_js_atenua_informativos_de_ambos_modos(client):
     assert INFO_RET.startswith("Informativo") and INFO_VEN.startswith("Informativo")
     for ruta in ("/sesion", "/conciliar", "/status/", "/tablero/", "/download/", "esc("):
         assert ruta in js
+
+
+def test_status_valida_el_id(entorno_sesion):
+    client, cookies, _ = entorno_sesion
+    for jid in ("zzzz", "..%5C..", "%2e%2e", "ABCDEF01", "abcdef012"):
+        assert client.get(f"/status/{jid}", cookies=cookies).status_code == 404, jid
+
+
+def test_status_no_devuelve_traceback(entorno_sesion, monkeypatch):
+    import app.sesion as sesion
+    from app.job_manager import read_status
+    from test_sesion import _txt
+    client, cookies, _ = entorno_sesion
+
+    def falla(*a, **k):
+        raise RuntimeError("fallo simulado")
+
+    monkeypatch.setattr(sesion, "procesar_compras", falla)
+    sid = _crear(client, cookies)
+    assert _subir(client, cookies, sid, ("a.txt", _txt(1))).status_code == 200
+    assert client.post(f"/sesion/{sid}/conciliar", cookies=cookies).status_code == 200
+    s = _esperar_done(client, cookies, sid)
+    assert s["estado"] == "error" and "fallo simulado" in s["mensaje"]
+    assert "Traceback" not in client.get(f"/status/{sid}", cookies=cookies).text
+    assert "error" not in s
+    assert "Traceback" in (read_status(sid) or {}).get("error", "")  # sigue en disco para diagnostico

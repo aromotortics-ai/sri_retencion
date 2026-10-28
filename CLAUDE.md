@@ -60,11 +60,11 @@ Dependencias: `pip install -r requirements.txt` (pandas, openpyxl, requests, fas
 | `POST /sesion/{id}/txt` (campo `archivos`, uno o varios `.txt`) | Guarda y valida cada TXT; devuelve `{archivos, generacion}`. **No recalcula** |
 | `DELETE /sesion/{id}/txt/{nombre}` | Quita un TXT; devuelve `{archivos}` |
 | `POST /sesion/{id}/conciliar` | Incrementa la generación y lanza el recálculo completo en un hilo; devuelve `{generacion}` |
-| `GET /status/{id}` | `status.json` del último recálculo (`estado`, `mensaje`, `progreso`, `resumen`) |
+| `GET /status/{id}` | `status.json` del último recálculo (`estado`, `mensaje`, `progreso`, `resumen`). **No devuelve el traceback**: `error` queda solo en `status.json` y en el log del servidor |
 | `GET /tablero/{id}` | `tablero.json` publicado (404 si aún no hay) |
 | `GET /download/{id}?tipo=observaciones\|completo` | Excel (`Observaciones_SRI.xlsx` / `Conciliacion_SRI.xlsx`); default `completo` |
 
-- Los ids (`[0-9a-f]{8}`, de `create_job`) se validan antes de tocar el disco; sesión inexistente o vencida → 404; sesión ocupada (bloqueo > 10 s) → 503.
+- Los ids (`[0-9a-f]{8}`, de `create_job`) se validan antes de tocar el disco (también en `/status`, `/tablero` y `/download`); sesión inexistente o vencida → 404; sesión ocupada (bloqueo > 10 s) → 503.
 - **Límites de subida**: Compras 5 TXT y Ventas 400 TXT por sesión (`sesion.LIMITES`; el mismo nombre = reemplazo y no cuenta), **20 MB por archivo** y **200 MB por solicitud** (`MAX_BYTES_TXT`, `MAX_BYTES_LOTE`) → 413 / 400. El middleware ASGI `LimiteSubida` corta con 413 (por `Content-Length` o contando bytes si va chunked) antes de analizar/guardar el cuerpo. Solo `.txt`; los nombres se reducen a basename y la extensión se normaliza a `.txt` minúscula (los pipelines usan `glob`, sensible a mayúsculas en Linux).
 - El cliente (`tablero.js`) sube los TXT, y tras ~700 ms sin cambios pide `POST .../conciliar` y sondea `/status` cada 2 s hasta ver su generación; entonces lee `/tablero`.
 
@@ -89,10 +89,10 @@ jobs/<id>/.lock                bloqueo por sesión (O_EXCL; serializa hilos y wo
 
 ### Tablero y Excel de observaciones (`app/reportes/`)
 
-- `tablero.construir_tablero` produce `tablero.json`: `modo`, `periodo`, `tarjetas` (una por tipo FAC/NC/ND/LIQ/RET con `total`, `coinciden`, `por_estado`), `excepciones` (todo lo que no es `Coincide`, con `tipo, estado, documento, fecha, contraparte, ruc, valor_sri, valor_odoo, diferencia, detalle, que_corregir, accionable`) y `advertencias`.
+- `tablero.construir_tablero` produce `tablero.json`: `modo`, `periodo`, `tarjetas` (una por tipo FAC/NC/ND/LIQ/RET con `total`, `coinciden`, `por_estado`; `total` = "Comprobantes SRI" del Resumen del Excel completo, es decir los documentos con lado SRI sin repetidos —en RET, los documentos con alguna línea SRI—, de modo que "N de M comprobantes del SRI coinciden" coincide con el Resumen; lo que existe solo en Odoo no entra en `total` y se ve en `por_estado` y como "+K solo en Odoo"), `excepciones` (todo lo que no es `Coincide`, con `tipo, estado, documento, fecha, contraparte, ruc, valor_sri, valor_odoo, diferencia, detalle, que_corregir, accionable`) y `advertencias`.
 - `observaciones.QUE_CORREGIR` mapea cada estado **accionable** a la instrucción de corrección en Odoo; `ACCIONABLES` es su conjunto: Solo en SRI, Solo en Odoo, Diferencia de valor, Diferencia de datos, Factura incorrecta en Odoo, Odoo anulado/SRI autorizado, Duplicado en Odoo, XML no disponible. Los Informativos no son accionables.
-- `escribir_excel_observaciones`: **solo filas accionables**, una hoja por estado, columnas fijas con "Qué corregir en Odoo" (`que_corregir`); sin observaciones, una hoja `Sin_observaciones`. Los textos se protegen contra inyección de fórmulas.
-- El Excel **completo** (`resultado.xlsx`) es el de cada pipeline (`excel_compras`, `excel_emitidos`) y se ofrece aparte. Ambos Excel y el tablero salen de las mismas cifras.
+- `escribir_excel_observaciones`: **solo filas accionables**, una hoja por estado, columnas con los mismos títulos que la tabla en pantalla (Tipo, Estado, Documento, Fecha, Contraparte, RUC, Valor SRI, Valor Odoo, Diferencia, Detalle, "Qué corregir en Odoo"), fecha como fecha real `dd/mm/yyyy` y montos numéricos `#,##0.00`; sin observaciones, una hoja `Sin_observaciones`. Los textos se protegen contra inyección de fórmulas.
+- El Excel **completo** (`resultado.xlsx`) es el de cada pipeline (`excel_compras`, `excel_emitidos`) y se ofrece aparte. Garantía: el `total` y los conteos por estado de cada tarjeta son los de la fila de ese tipo en el Resumen del Excel completo (test `test_total_tarjeta_igual_comprobantes_sri_del_resumen`); el Excel de observaciones es el subconjunto accionable de las mismas excepciones del tablero. Los botones de descarga se deshabilitan mientras haya un recálculo pendiente o en curso, y una barra "Resultado desactualizado — Reintentar" aparece si falló el último recálculo.
 
 ## Web service SRI — endpoints confirmados (agosto 2026)
 

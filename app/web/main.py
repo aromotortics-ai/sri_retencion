@@ -282,9 +282,12 @@ def tablero(sesion_id: str, _user: str = Depends(require_session)):
 
 @app.get("/status/{job_id}")
 def status(job_id: str, _user: str = Depends(require_session)):
+    if not _ID_RE.fullmatch(job_id):
+        raise HTTPException(status_code=404, detail="Job no encontrado")
     s = read_status(job_id)
     if s is None:
         raise HTTPException(status_code=404, detail="Job no encontrado")
+    s.pop("error", None)  # el traceback queda en status.json (diagnóstico en el servidor), no va al cliente
     return s
 
 
