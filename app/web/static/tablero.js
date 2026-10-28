@@ -215,8 +215,13 @@
       sondear(st, 0);
     } catch (e) {
       if (e instanceof NoAutenticado || !vigente(st)) return;
-      st.cambios = true;
-      avisar(st, `No se pudo recalcular: ${e.message}`);
+      if (e.status === 404) {
+        st.cambios = false;  // la sesión ya no existe: reintentar no sirve
+        avisar(st, "La sesión expiró. Pulsa «Nueva conciliación» y vuelve a subir los TXT.");
+      } else {
+        st.cambios = true;   // el banner «Resultado desactualizado» ofrece reintentar
+        avisar(st, `No se pudo recalcular: ${e.message}`);
+      }
     }
     render();
   }
@@ -354,6 +359,10 @@
       html += `<div class="aviso error" role="alert"><span>No se pudo actualizar el resultado: ${esc(st.errorCalculo)}`
         + `${st.tablero ? " Se muestra el último resultado disponible." : ""}</span></div>`;
     }
+    if (st.cambios && !st.actualizando && !st.tDebounce && !st.subiendo && !st.cola.length && st.sid) {
+      html += '<div class="aviso error" role="alert"><span>Resultado desactualizado.</span>'
+        + '<button class="reintentar" data-reintentar="1">Reintentar</button></div>';
+    }
     $("avisos").innerHTML = html;
   }
 
@@ -378,18 +387,23 @@
       return;
     }
     if (!t.tarjetas.length) {
-      $("tarjetas").innerHTML = '<div class="vacio">No hay comprobantes válidos para conciliar. Revisa los archivos con error.</div>';
+      const hayError = st.archivos.some(a => a.estado === "error");
+      $("tarjetas").innerHTML = `<div class="vacio">${hayError
+        ? "No hay comprobantes válidos para conciliar. Revisa los archivos con error."
+        : "Agrega TXT para comenzar."}</div>`;
       return;
     }
     $("tarjetas").innerHTML = t.tarjetas.map(c => {
-      const pctOk = c.total ? Math.round((c.coinciden / c.total) * 1000) / 10 : 0;
+      const pctOk = c.total ? Math.min(100, Math.round((c.coinciden / c.total) * 1000) / 10) : 0;
       const otros = Object.entries(c.por_estado || {}).filter(([e]) => e !== "Coincide")
         .sort((a, b) => b[1] - a[1]).map(([e, n]) => `${esc(e)} ${esc(n)}`).join(" · ");
+      const soloOdoo = (c.por_estado || {})["Solo en Odoo"] || 0;
       const sel = st.f.tipo === c.tipo;
       return `<button class="tarjeta${sel ? " sel" : ""}${c.total && c.coinciden === c.total ? " completa" : ""}" data-tipo="${esc(c.tipo)}" aria-pressed="${sel}" title="Filtrar la tabla por ${esc(c.etiqueta)}">`
         + `<span class="etq">${esc(c.etiqueta)}</span>`
-        + `<span class="cifra"><b>${esc(c.coinciden)}</b> de ${esc(c.total)} coinciden</span>`
+        + `<span class="cifra"><b>${esc(c.coinciden)}</b> de ${esc(c.total)} comprobantes del SRI coinciden</span>`
         + `<span class="barra-av"><i style="width:${pctOk}%"></i></span>`
+        + (soloOdoo ? `<span class="desglose">+${esc(soloOdoo)} solo en Odoo</span>` : "")
         + `<span class="desglose">${otros || "Sin observaciones"}</span></button>`;
     }).join("");
   }
@@ -409,8 +423,11 @@
   function pintarExcepciones(st) {
     const t = st.tablero, f = st.f;
     const exc = (t && t.excepciones) || [];
-    $("btn-obs").disabled = !st.sid || !exc.some(e => e.accionable);
-    $("btn-completo").disabled = !st.sid || !t || !t.tarjetas.length;
+    const pendiente = Boolean(st.tDebounce || st.actualizando || st.cambios);
+    const espera = "Espera a que termine la actualización";
+    $("btn-obs").disabled = !st.sid || !exc.some(e => e.accionable) || pendiente;
+    $("btn-completo").disabled = !st.sid || !t || !t.tarjetas.length || pendiente;
+    $("btn-obs").title = $("btn-completo").title = pendiente ? espera : "";
 
     const tipos = (t && t.tarjetas) || [];
     if (f.tipo && !tipos.some(c => c.tipo === f.tipo)) f.tipo = "";
@@ -511,6 +528,7 @@
     $("avisos").addEventListener("click", e => {
       const b = e.target.closest("[data-cerrar]");
       if (b) { actual().errores.splice(Number(b.dataset.cerrar), 1); render(); }
+      if (e.target.closest("[data-reintentar]")) conciliar(actual());
     });
     $("tarjetas").addEventListener("click", e => {
       const b = e.target.closest("[data-tipo]");

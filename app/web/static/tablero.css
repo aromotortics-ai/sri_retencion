@@ -149,3 +149,4 @@ tr.info .est { opacity: .7; }
   .filtros-der input[type=search] { width: 100%; }
 }
 .chips[hidden] { display: none; }
+.aviso .reintentar { margin-left: auto; }

@@ -2,6 +2,7 @@
 import json
 from datetime import date
 
+import openpyxl
 import pandas as pd
 import pytest
 
@@ -88,7 +89,7 @@ def test_tarjetas_cuentan_documentos_de_retenciones():
                           _sri_v(), _odoo_v().iloc[0:0], retdocs, [DESDE.isoformat(), HASTA.isoformat()], [])
     assert [x["tipo"] for x in t["tarjetas"]] == ["RET"]
     r = t["tarjetas"][0]
-    assert r["etiqueta"] == "Retenciones" and r["total"] == 3 and r["coinciden"] == 1
+    assert r["etiqueta"] == "Retenciones" and r["total"] == 2 and r["coinciden"] == 1  # el Informativo no tiene lado SRI
     assert r["por_estado"] == {cr.EST_OK: 1, cr.EST_SOLO_SRI: 1, cr.EST_INFO: 1}
 
 
@@ -152,11 +153,10 @@ def test_cifras_tablero_igualan_excel_completo(tmp_path):
     assert set(tarj) == {"FAC", "NC", "RET"}
     for tipo, c in tarj.items():
         esperado = res["documentos"][tipo]
-        assert c["total"] == esperado["total"], tipo
+        assert sum(c["por_estado"].values()) == esperado["total"], tipo  # todas las filas siguen en por_estado
         for estado, n in c["por_estado"].items():
             assert esperado[estado] == n, (tipo, estado)
         assert c["coinciden"] == esperado.get("Coincide", 0)
-        assert sum(c["por_estado"].values()) == c["total"]
     # Compras
     sri, odoo, pares = _datos_c()
     odoo = pd.concat([odoo, pd.DataFrame([
@@ -187,3 +187,51 @@ def test_cifras_tablero_igualan_excel_completo(tmp_path):
     ex = [x for x in t["excepciones"] if x["estado"] == "Diferencia de valor"][0]
     assert ex["contraparte"] == "OTRO SA" and ex["diferencia"] == 10.0
     json.dumps(t)
+
+
+def _celdas(ws, col):
+    return [c.value for c in ws[col][1:]]
+
+
+def test_total_tarjeta_igual_comprobantes_sri_del_resumen(tmp_path):
+    """card.total == "Comprobantes SRI" del Resumen (se evalúa aquí el mismo COUNTIFS sobre las hojas
+    fuente porque LibreOffice está desactivado y las fórmulas no se calculan)."""
+    # Ventas: Resumen!C = COUNTIFS(Conciliacion tipo, SRI total no vacío, estado <> Duplicado/Informativo)
+    sri, odoo = _datos_v()
+    odoo.loc[odoo["id"] == 5, "estado"] = "draft"
+    docs = clasificar_documentos(sri, odoo, DESDE, HASTA)
+    ret = _ret()
+    ruta = str(tmp_path / "v.xlsx")
+    construir_excel_emitidos(sri, odoo, docs, ret, DESDE, HASTA, ruta)
+    t = construir_tablero("ventas", docs, sri, odoo, cr.resumir_por_documento(ret), None, [])
+    wb = openpyxl.load_workbook(ruta)
+    rs = wb["Resumen"]
+    assert rs["C5"].value.startswith("=COUNTIFS(Conciliacion!$A$2")  # la fórmula que se replica
+    conc = wb["Conciliacion"]
+    tipos, estados, sris = _celdas(conc, "A"), _celdas(conc, "B"), _celdas(conc, "G")
+    tarj = {x["tipo"]: x for x in t["tarjetas"]}
+    for tipo, c in tarj.items():
+        if tipo == "RET":
+            continue
+        esperado = sum(1 for a, b, g in zip(tipos, estados, sris)
+                       if a == tipo and g not in (None, "") and b not in ("Duplicado en Odoo", "Informativo"))
+        assert c["total"] == esperado, tipo
+    # Ret: Resumen!C = COUNTIFS(Ret_Documentos!H, ">0")
+    assert "COUNTIFS(Ret_Documentos!$H$2" in "".join(
+        str(c.value) for row in rs.iter_rows() for c in row if c.value and "Ret_Documentos" in str(c.value))
+    # Lineas_SRI (H) de cada documento = COUNTIFS(Ret_Conciliacion!Q = doc, L numérico [, A <> Informativo])
+    rd, rc_ = wb["Ret_Documentos"], wb["Ret_Conciliacion"]
+    lineas = list(zip(_celdas(rc_, "Q"), _celdas(rc_, "A"), _celdas(rc_, "L")))
+    docs_ret = [(d, e) for d, e in zip(_celdas(rd, "N"), _celdas(rd, "A")) if d]
+    con_sri = sum(1 for d, e in docs_ret if sum(
+        1 for q, est, v in lineas if q == d and isinstance(v, (int, float))
+        and (e == "Informativo (Odoo cancelada/borrador)" or not est.startswith("Informativo"))) > 0)
+    assert tarj["RET"]["total"] == con_sri == 2
+    # Compras: Resumen!C = COUNTIFS(SRI_Listado tipo, mes) sumado = filas SRI por tipo
+    sri, odoo, pares = _datos_c()
+    rc = str(tmp_path / "c.xlsx")
+    construir_excel(sri, odoo, pares, DESDE, HASTA, rc)
+    t = construir_tablero("compras", clasificar_compras(sri, odoo, pares), sri, odoo, None, None, [])
+    listado = _celdas(openpyxl.load_workbook(rc)["SRI_Listado"], "B")
+    for c in t["tarjetas"]:
+        assert c["total"] == listado.count(c["tipo"]), c["tipo"]

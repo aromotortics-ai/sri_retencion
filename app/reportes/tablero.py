@@ -8,6 +8,7 @@ from app.sri.emitidos_sri import TIPOS_DOC
 ETIQUETAS = {"FAC": "Facturas", "NC": "Notas de crédito", "ND": "Notas de débito",
              "LIQ": "Liquidaciones", "RET": "Retenciones"}
 EST_OK = "Coincide"
+_REPETIDOS = ("Duplicado en Odoo",)
 
 
 def _v(x):
@@ -74,11 +75,13 @@ def _filas_ret(retdocs):
     return out
 
 
-def _tarjeta(tipo, estados):
+def _tarjeta(tipo, estados, con_sri):
+    """`total` = "Comprobantes SRI" del Resumen del Excel (documentos con lado SRI, sin repetidos);
+    los que existen solo en Odoo no cuentan en `total` y se ven en `por_estado`."""
     por_estado = {}
     for e in estados:
         por_estado[e] = por_estado.get(e, 0) + 1
-    return {"tipo": tipo, "etiqueta": ETIQUETAS[tipo], "total": len(estados),
+    return {"tipo": tipo, "etiqueta": ETIQUETAS[tipo], "total": int(con_sri),
             "coinciden": por_estado.get(EST_OK, 0), "por_estado": por_estado}
 
 
@@ -89,12 +92,18 @@ def construir_tablero(modo, docs, sri, odoo, retdocs, periodo, advertencias) -> 
     if docs is not None and len(docs):
         filas += _filas_docs(docs, sri, odoo)
         for t in TIPOS_DOC:
-            est = [str(e) for e in docs.loc[docs["tipo"] == t, "estado"]]
+            d = docs[docs["tipo"] == t]
+            est = [str(e) for e in d["estado"]]
             if est:
-                tarjetas.append(_tarjeta(t, est))
+                # mismo criterio que la columna "Comprobantes SRI" del Resumen: lado SRI y no repetido
+                con_sri = (d["idx_sri"].notna() & ~d["estado"].astype(str).isin(_REPETIDOS)
+                           & ~d["estado"].astype(str).str.startswith("Informativo")).sum()
+                tarjetas.append(_tarjeta(t, est, con_sri))
     if retdocs is not None and len(retdocs):
         filas += _filas_ret(retdocs)
-        tarjetas.append(_tarjeta("RET", [str(e) for e in retdocs["estado"]]))
+        # Resumen: COUNTIFS(Lineas_SRI > 0) sobre Ret_Documentos
+        con_sri = (pd.to_numeric(retdocs["n_lineas_sri"], errors="coerce").fillna(0) > 0).sum()
+        tarjetas.append(_tarjeta("RET", [str(e) for e in retdocs["estado"]], con_sri))
     return {"modo": modo,
             "periodo": None if periodo is None else [_v(p) for p in periodo],
             "tarjetas": tarjetas,
