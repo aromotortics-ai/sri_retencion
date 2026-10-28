@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
+import datetime
+
 import openpyxl
 
-from app.reportes.observaciones import ACCIONABLES, COLUMNAS_OBS, QUE_CORREGIR, escribir_excel_observaciones
+from app.reportes.observaciones import (ACCIONABLES, COLUMNAS_OBS, QUE_CORREGIR, TITULOS_OBS,
+                                        escribir_excel_observaciones)
 
 
 def _fila(estado, n, **kw):
@@ -28,7 +31,9 @@ def test_excel_observaciones_solo_accionables(tmp_path):
     # orden de QUE_CORREGIR, no de aparición
     assert wb.sheetnames == ["Solo en SRI", "Diferencia de valor", "Odoo anulado, SRI autorizado"]
     ws = wb["Solo en SRI"]
-    assert [c.value for c in ws[1]] == COLUMNAS_OBS[:-1]
+    assert [c.value for c in ws[1]] == TITULOS_OBS == [
+        "Tipo", "Estado", "Documento", "Fecha", "Contraparte", "RUC", "Valor SRI", "Valor Odoo", "Diferencia",
+        "Detalle", "Qué corregir en Odoo"]
     assert ws.freeze_panes == "A2" and ws.auto_filter.ref
     textos = [c.value for w in wb for r in w.iter_rows() for c in r]
     assert "Coincide" not in textos and "Informativo" not in textos
@@ -57,3 +62,15 @@ def test_excel_sin_observaciones_es_valido(tmp_path):
     wb = openpyxl.load_workbook(ruta)
     assert wb.sheetnames == ["Sin_observaciones"]
     assert "No hay observaciones" in wb["Sin_observaciones"]["A1"].value
+
+
+def test_fecha_real_y_montos_numericos(tmp_path):
+    exc = [_fila("Solo en SRI", 1), _fila("Solo en SRI", 2, fecha=None, valor_odoo=None, diferencia=None)]
+    ruta = str(tmp_path / "o.xlsx")
+    escribir_excel_observaciones({"excepciones": exc}, ruta)
+    ws = openpyxl.load_workbook(ruta)["Solo en SRI"]
+    f = ws["D2"]
+    assert f.value == datetime.datetime(2026, 9, 5) and f.is_date and f.number_format == "dd/mm/yyyy"
+    for col in "GHI":
+        assert ws[f"{col}2"].value in (10.0, 9.0, 1.0) and ws[f"{col}2"].number_format == "#,##0.00"
+    assert ws["D3"].value is None and ws["H3"].value is None
