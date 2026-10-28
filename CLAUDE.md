@@ -30,8 +30,9 @@ app/
   reportes/       tablero.py (cifras del tablero), observaciones.py (Excel de observaciones), estilos.py
 scripts/          CLI sueltos: conciliar_emitidas.py, conciliar_recibidas.py, mover_emitidos.py, setup_usuario.py
 tests/            espeja app/ (tests/web, tests/sri, tests/compras, ...) más tests/scripts
-deploy/           install.sh (instalación en VPS Ubuntu)
+deploy/           install.sh (instalación manual en VPS; referencia nginx.conf y sri-conciliacion.service que NO están en el repo)
 docs/superpowers/ specs y planes de cada funcionalidad (fuente de diseño)
+README.md         guía de uso, despliegue en Easypanel y pendientes conocidos
 ```
 
 ## Comandos
@@ -45,6 +46,7 @@ python scripts/conciliar_emitidas.py odoo.xlsx retenciones_emitidas salida.xlsx 
 
 Dependencias: `pip install -r requirements.txt` (pandas, openpyxl, requests, fastapi, uvicorn, gunicorn, bcrypt, pyyaml, itsdangerous, python-multipart, pytest, httpx).
 `Dockerfile` copia solo `app/` y `scripts/`; `cache/xml`, `jobs` y `data` son volúmenes persistentes.
+En Easypanel el servicio debe definir `SECRET_KEY` (sin ella cada worker firma con una clave distinta y el login falla de forma intermitente) además de `ODOO_*`; el comando de inicio es el `CMD` del Dockerfile (`app.web.main:app`). Detalle en `README.md`.
 
 ## Aplicación web (FastAPI)
 
@@ -251,3 +253,5 @@ sube ningún Excel de Odoo.
 ## Pendiente / a validar
 
 - [ ] Analizar las ~198 retenciones "Solo en SRI" de agosto para determinar si son registros pendientes de ingresar en Odoo o pertenecen a otra empresa/período.
+- [ ] Aislamiento por usuario: hoy cualquier usuario con sesión que conozca un id de sesión (8 hex) lee ese tablero y sus Excel. Solución prevista: guardar el dueño en `sesion.json`, responder 404 a otros y usar `secrets.token_hex(16)` (actualizar `_ID_RE`).
+- [ ] Menores aparcados: `mark_stale_jobs_as_error` corre en cada arranque de worker; Ventas RET muestra el RUC propio; Compras "Solo en Odoo" muestra el nombre del asiento y no el número del proveedor; un TXT de retenciones sin fechas válidas falla todo el recálculo sin nombrar el archivo; el select y la tabla se re-renderizan cada 2 s; accesibilidad por teclado de los encabezados ordenables; `deploy/install.sh` sin sus archivos nginx/systemd.
